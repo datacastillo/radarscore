@@ -1,6 +1,5 @@
 import { Match } from '@/data/mockMatches';
 
-// Mapeo de banderas emoji por código de competición
 const getLeagueEmoji = (code?: string): string => {
   switch (code) {
     case 'PL':
@@ -15,12 +14,6 @@ const getLeagueEmoji = (code?: string): string => {
       return '🇫🇷';
     case 'SA':
       return '🇮🇹';
-    case 'DED':
-      return '🇳🇱';
-    case 'PPD':
-      return '🇵🇹';
-    case 'BSA':
-      return '🇧🇷';
     default:
       return '⚽';
   }
@@ -35,33 +28,44 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
     if (!data.matches || !Array.isArray(data.matches)) return null;
 
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+
+    // Helper para obtener string local YYYY-MM-DD
+    const getLocalDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const todayStr = getLocalDateStr(now);
 
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowStr = getLocalDateStr(tomorrow);
 
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = getLocalDateStr(yesterday);
 
     return data.matches.map((m: any) => {
       const matchDate = new Date(m.utcDate);
-      const dateStr = m.utcDate ? m.utcDate.split('T')[0] : '';
+      const matchDateStr = getLocalDateStr(matchDate);
 
-      // Categoría de fecha para los filtros
-      let dateCategory: 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE' = 'MAÑANA';
+      // Categoría exacta de fecha
+      let dateCategory: 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE' | 'PROXIMOS' = 'HOY';
 
       if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
         dateCategory = 'LIVE';
-      } else if (dateStr === todayStr) {
+      } else if (matchDateStr === todayStr) {
         dateCategory = 'HOY';
-      } else if (dateStr === tomorrowStr) {
+      } else if (matchDateStr === tomorrowStr) {
         dateCategory = 'MAÑANA';
-      } else if (dateStr === yesterdayStr) {
+      } else if (matchDateStr === yesterdayStr) {
         dateCategory = 'AYER';
+      } else if (matchDate > now) {
+        dateCategory = 'PROXIMOS';
       } else {
-        dateCategory = matchDate > now ? 'MAÑANA' : 'AYER';
+        dateCategory = 'AYER';
       }
 
       // Hora local
@@ -71,7 +75,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         hour12: true,
       });
 
-      // Día y mes formateados en español (ej: 21 AGO)
+      // Día y mes en español (ej: 21 AGO)
       const dayFormatted = matchDate
         .toLocaleDateString('es-ES', {
           day: '2-digit',
@@ -81,9 +85,9 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         .replace('.', '');
 
       const timeLabel =
-        dateStr === todayStr
+        matchDateStr === todayStr
           ? `HOY - ${timeFormatted}`
-          : dateStr === tomorrowStr
+          : matchDateStr === tomorrowStr
           ? `MAÑANA - ${timeFormatted}`
           : `${dayFormatted} - ${timeFormatted}`;
 
@@ -92,7 +96,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         league: m.competition?.name
           ? m.competition.name.toUpperCase()
           : 'PREMIER LEAGUE',
-        flag: getLeagueEmoji(m.competition?.code), // Emoji limpio en lugar de URL
+        flag: getLeagueEmoji(m.competition?.code),
         homeTeam: {
           name: m.homeTeam?.shortName || m.homeTeam?.name || 'Local',
           logo: m.homeTeam?.crest || '',
@@ -129,7 +133,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
             ? 'FT'
             : 'SCHEDULED',
         time: timeLabel,
-        dateCategory,
+        dateCategory: dateCategory as any,
         aiPrediction: {
           recommendation: 'Gana Local o Empate',
           confidence: 88,

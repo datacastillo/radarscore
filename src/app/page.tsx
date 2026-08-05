@@ -7,164 +7,181 @@ import MatchModal from '@/components/MatchModal';
 import StandingsModal from '@/components/StandingsModal';
 import { fetchRealMatches } from '@/services/footballApi';
 
-type FilterType = 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE';
-
-const LEAGUES = [
-  { id: 'ALL', name: 'Todas las Ligas', flag: '🌍' },
-  { id: 'PREMIER', name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-  { id: 'LALIGA', name: 'LaLiga', flag: '🇪🇸' },
-  { id: 'CHAMPIONS', name: 'Champions League', flag: '🇪🇺' },
-];
-
 export default function Home() {
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [selectedLeagueTable, setSelectedLeagueTable] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('HOY');
-  const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
+  const [selectedLeagueForTable, setSelectedLeagueForTable] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA'>('MAÑANA');
+  const [selectedLeague, setSelectedLeague] = useState<string>('TODAS');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
+    async function loadMatches() {
+      setLoading(true);
       const realData = await fetchRealMatches();
       if (realData && realData.length > 0) {
         setMatches(realData);
       }
-      setIsLoading(false);
+      setLoading(false);
     }
-    loadData();
+    loadMatches();
   }, []);
 
-  const getLeagueKey = (leagueString: string) => {
-    if (leagueString.includes('PREMIER')) return 'PREMIER';
-    if (leagueString.includes('LALIGA')) return 'LALIGA';
-    if (leagueString.includes('CHAMPIONS')) return 'CHAMPIONS';
-    return 'PREMIER';
+  // Mapeo de categoría a la propiedad dateCategory
+  const categoryMap: Record<string, string> = {
+    'EN VIVO': 'LIVE',
+    'AYER': 'AYER',
+    'HOY': 'HOY',
+    'MAÑANA': 'MAÑANA',
   };
 
-  const filteredMatches = matches.filter((match) => {
-    const matchesDate = activeFilter === 'LIVE' ? match.status === 'LIVE' : match.dateCategory === activeFilter;
+  const currentCategoryValue = categoryMap[selectedCategory];
+
+  // Comprobar si hay partidos estrictamente para la categoría seleccionada
+  const strictMatches = matches.filter((m) => m.dateCategory === currentCategoryValue);
+
+  // Si se selecciona MAÑANA u HOY y no hay partidos estrictos ese día, mostramos los PROXIMOS
+  const isShowingUpcomingFallback =
+    strictMatches.length === 0 && (selectedCategory === 'MAÑANA' || selectedCategory === 'HOY');
+
+  const matchesToFilter = isShowingUpcomingFallback
+    ? matches.filter((m) => (m.dateCategory as string) === 'PROXIMOS' || m.dateCategory === currentCategoryValue)
+    : strictMatches;
+
+  // Filtrar por Liga y Búsqueda por texto
+  const filteredMatches = matchesToFilter.filter((m) => {
     const matchesLeague =
-      selectedLeague === 'ALL' ||
-      (selectedLeague === 'PREMIER' && match.league.includes('PREMIER')) ||
-      (selectedLeague === 'LALIGA' && match.league.includes('LALIGA')) ||
-      (selectedLeague === 'CHAMPIONS' && match.league.includes('CHAMPIONS'));
+      selectedLeague === 'TODAS' ||
+      m.league.toLowerCase().includes(selectedLeague.toLowerCase());
 
-    const query = searchQuery.toLowerCase();
     const matchesSearch =
-      match.homeTeam.name.toLowerCase().includes(query) ||
-      match.awayTeam.name.toLowerCase().includes(query) ||
-      match.league.toLowerCase().includes(query);
+      searchQuery === '' ||
+      m.homeTeam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.awayTeam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.league.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesDate && matchesLeague && matchesSearch;
+    return matchesLeague && matchesSearch;
   });
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-4 md:p-8 max-w-5xl mx-auto">
-      {/* Header Principal */}
-      <header className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-b border-white/10 mb-6">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-          <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-white via-zinc-200 to-emerald-400 bg-clip-text text-transparent">
-            RADARSCORE<span className="text-emerald-500 text-xs align-super ml-1">AI</span>
+    <main className="min-h-screen bg-black text-white p-4 md:p-8 max-w-5xl mx-auto font-sans">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50" />
+          <h1 className="text-2xl font-black tracking-wider flex items-center gap-1.5">
+            RADARSCORE <span className="text-emerald-400 text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">AI</span>
           </h1>
         </div>
 
-        {/* Filtros por Tiempo */}
-        <div className="flex gap-1.5 text-xs font-semibold bg-zinc-900/80 p-1.5 rounded-xl border border-white/5">
-          <button
-            onClick={() => setActiveFilter('LIVE')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeFilter === 'LIVE'
-                ? 'bg-red-500/20 text-red-400 border border-red-500/40 font-bold'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-            EN VIVO
-          </button>
-
-          {(['AYER', 'HOY', 'MAÑANA'] as FilterType[]).map((tab) => (
+        {/* Filtros de Fecha */}
+        <div className="flex bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs font-bold">
+          {(['EN VIVO', 'AYER', 'HOY', 'MAÑANA'] as const).map((cat) => (
             <button
-              key={tab}
-              onClick={() => setActiveFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                activeFilter === tab
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold'
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                selectedCategory === cat
+                  ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
-              {tab}
+              {cat === 'EN VIVO' && <span className="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-pulse" />}
+              {cat}
             </button>
           ))}
         </div>
       </header>
 
-      {/* Controles de Búsqueda y Ligas */}
-      <div className="space-y-4 mb-8">
-        <div className="relative">
-          <span className="absolute inset-y-0 left-3 flex items-center text-zinc-500 text-sm">🔍</span>
-          <input
-            type="text"
-            placeholder="Buscar equipo o liga real..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-900/90 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
-          />
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {LEAGUES.map((league) => (
-            <button
-              key={league.id}
-              onClick={() => setSelectedLeague(league.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
-                selectedLeague === league.id
-                  ? 'bg-zinc-800 text-white border-emerald-500/50'
-                  : 'bg-zinc-900/40 text-zinc-400 border-white/5 hover:border-white/20'
-              }`}
-            >
-              {league.flag} {league.name}
-            </button>
-          ))}
-        </div>
+      {/* Buscador */}
+      <div className="relative mb-6">
+        <input
+          type="text"
+          placeholder="🔍 Buscar equipo o liga real..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-zinc-900/80 border border-zinc-800/80 rounded-xl px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+        />
       </div>
 
-      {/* Feed de Partidos */}
-      <section className="space-y-6">
-        {isLoading ? (
-          <div className="text-center py-16 bg-zinc-900/30 rounded-2xl border border-white/5 animate-pulse">
-            <p className="text-emerald-400 text-sm font-semibold">📡 Conectando con la API de Fútbol Real...</p>
+      {/* Filtros de Liga */}
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-none">
+        {[
+          { id: 'TODAS', label: '🌐 Todas las Ligas' },
+          { id: 'Premier League', label: '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League' },
+          { id: 'LaLiga', label: '🇪🇸 LaLiga' },
+          { id: 'Champions League', label: '🇪🇺 Champions League' },
+        ].map((league) => (
+          <button
+            key={league.id}
+            onClick={() => setSelectedLeague(league.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+              selectedLeague === league.id
+                ? 'bg-zinc-800 text-emerald-400 border-emerald-500/40 shadow-sm'
+                : 'bg-zinc-900/40 text-zinc-400 border-zinc-800/60 hover:text-zinc-200'
+            }`}
+          >
+            {league.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Banner Informativo si no hay partidos justo ese día */}
+      {isShowingUpcomingFallback && (
+        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-3">
+          <span className="text-lg">📅</span>
+          <div>
+            <p className="font-bold">No hay partidos programados para {selectedCategory.toLowerCase()}.</p>
+            <p className="text-zinc-400 text-[11px] mt-0.5">
+              Mostrando los próximos encuentros confirmados en el calendario oficial de la liga:
+            </p>
           </div>
-        ) : filteredMatches.length > 0 ? (
-          filteredMatches.map((match) => (
+        </div>
+      )}
+
+      {/* Lista de Partidos */}
+      {loading ? (
+        <div className="py-20 text-center text-zinc-500 animate-pulse text-sm">
+          Cargando partidos en tiempo real...
+        </div>
+      ) : filteredMatches.length > 0 ? (
+        <div className="space-y-4">
+          {filteredMatches.map((match) => (
             <div key={match.id}>
-              <div className="flex items-center justify-between text-xs font-bold text-zinc-400 tracking-wider uppercase border-l-2 border-emerald-500 pl-3 mb-3">
-                <span>{match.flag} {match.league}</span>
+              <div className="flex justify-between items-center mb-2 px-1">
+                <span className="text-xs font-extrabold tracking-wider text-zinc-400 flex items-center gap-2">
+                  <span>{match.flag}</span>
+                  <span>{match.league}</span>
+                </span>
                 <button
-                  onClick={() => setSelectedLeagueTable(getLeagueKey(match.league))}
-                  className="text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                  onClick={() => setSelectedLeagueForTable(match.league)}
+                  className="text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1"
                 >
                   Ver Tabla 📊
                 </button>
               </div>
-              <div onClick={() => setSelectedMatch(match)} className="cursor-pointer">
-                <MatchCard match={match} />
-              </div>
+              <MatchCard match={match} onSelect={(m) => setSelectedMatch(m)} />
             </div>
-          ))
-        ) : (
-          <div className="text-center py-16 bg-zinc-900/30 rounded-2xl border border-white/5">
-            <p className="text-zinc-400 text-sm font-medium">No hay partidos programados en este momento.</p>
-          </div>
-        )}
-      </section>
+          ))}
+        </div>
+      ) : (
+        <div className="py-20 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800/50">
+          <p className="text-zinc-400 font-medium text-sm">No se encontraron partidos para este filtro.</p>
+        </div>
+      )}
 
       {/* Modales */}
-      <MatchModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-      <StandingsModal leagueKey={selectedLeagueTable} onClose={() => setSelectedLeagueTable(null)} />
+      {selectedMatch && (
+        <MatchModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+      )}
+
+      {selectedLeagueForTable && (
+        <StandingsModal
+          leagueName={selectedLeagueForTable}
+          onClose={() => setSelectedLeagueForTable(null)}
+        />
+      )}
     </main>
   );
 }
