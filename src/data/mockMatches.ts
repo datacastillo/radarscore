@@ -3,6 +3,7 @@ export interface Match {
   league: string;
   flag: string;
   status: 'LIVE' | 'FINISHED' | 'SCHEDULED';
+  dateCategory: 'AYER' | 'HOY' | 'MAÑANA';
   minute?: number;
   time?: string;
   homeTeam: { name: string; icon: string; form: string[] };
@@ -28,6 +29,7 @@ export const MOCK_MATCHES: Match[] = [
     league: 'PREMIER LEAGUE · JORNADA 26',
     flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
     status: 'LIVE',
+    dateCategory: 'HOY',
     minute: 68,
     homeTeam: { name: 'Arsenal', icon: '🔴', form: ['V', 'V', 'E'] },
     awayTeam: { name: 'Chelsea', icon: '🔵', form: ['D', 'V', 'E'] },
@@ -45,6 +47,7 @@ export const MOCK_MATCHES: Match[] = [
     league: 'LALIGA EA SPORTS · JORNADA 24',
     flag: '🇪🇸',
     status: 'SCHEDULED',
+    dateCategory: 'HOY',
     time: '21:00',
     homeTeam: { name: 'Real Madrid', icon: '⚪', form: ['V', 'V', 'V'] },
     awayTeam: { name: 'Barcelona', icon: '🔵🔴', form: ['V', 'E', 'V'] },
@@ -60,6 +63,7 @@ export const MOCK_MATCHES: Match[] = [
     league: 'UEFA CHAMPIONS LEAGUE · OCTAVOS',
     flag: '🇪🇺',
     status: 'FINISHED',
+    dateCategory: 'AYER',
     homeTeam: { name: 'Bayern Munich', icon: '🔴', form: ['V', 'D', 'V'] },
     awayTeam: { name: 'PSG', icon: '🔵', form: ['V', 'V', 'E'] },
     homeScore: 3,
@@ -71,4 +75,20 @@ export const MOCK_MATCHES: Match[] = [
     aiInsight: 'Predicción acertada. Dominio absoluto del Bayern en tiros a puerta durante el primer tiempo.',
     stats: { xg: [3.4, 1.1], possession: [58, 42], shotsOnTarget: [10, 4], fouls: [8, 12] }
   },
+  {
+    id: '4',
+    league: 'PREMIER LEAGUE · JORNADA 27',
+    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    status: 'SCHEDULED',
+    dateCategory: 'MAÑANA',
+    time: '17:30',
+    homeTeam: { name: 'Manchester City', icon: '🩵', form: ['V', 'V', 'V'] },
+    awayTeam: { name: 'Liverpool', icon: '🔴', form: ['V', 'E', 'V'] },
+    stadium: 'Etihad Stadium',
+    aiConfidence: 82,
+    aiPrediction: 'Gana Local o Empate (75%)',
+    probs: { home: 52, draw: 28, away: 20 },
+    aiInsight: 'Duelo por el liderato. City promedia 2.8 goles como local esta temporada.',
+    stats: { xg: [2.0, 1.5], possession: [55, 45], shotsOnTarget: [6, 5], fouls: [7, 9] }
+  }
 ];
