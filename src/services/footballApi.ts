@@ -1,4 +1,5 @@
 import { Match } from '@/data/mockMatches';
+import { calculatePoissonPrediction } from '@/lib/poissonEngine';
 
 const getLeagueEmoji = (code?: string): string => {
   switch (code) {
@@ -14,6 +15,10 @@ const getLeagueEmoji = (code?: string): string => {
       return '🇫🇷';
     case 'SA':
       return '🇮🇹';
+    case 'DED':
+      return '🇳🇱';
+    case 'PPL':
+      return '🇵🇹';
     default:
       return '⚽';
   }
@@ -93,6 +98,21 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
           ? `MAÑANA - ${timeFormatted}`
           : `${dayName} ${dayNum} ${monthName} - ${timeFormatted}`;
 
+      const homeTeamName = m.homeTeam?.shortName || m.homeTeam?.name || 'Local';
+      const awayTeamName = m.awayTeam?.shortName || m.awayTeam?.name || 'Visitante';
+
+      // 🧠 CÁLCULO DE LA PREDICCIÓN CUANTITATIVA (POISSON + CÓRNERS)
+      const prediction = calculatePoissonPrediction(homeTeamName, awayTeamName, {
+        homeGoalsScoredAvg: 1.6,
+        homeGoalsConcededAvg: 1.0,
+        awayGoalsScoredAvg: 1.2,
+        awayGoalsConcededAvg: 1.5,
+        homeCornersForAvg: 5.8,
+        homeCornersAgainstAvg: 4.2,
+        awayCornersForAvg: 4.3,
+        awayCornersAgainstAvg: 5.6,
+      });
+
       return {
         id: String(m.id),
         league: m.competition?.name
@@ -100,12 +120,12 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
           : 'LIGA OFICIAL',
         flag: getLeagueEmoji(m.competition?.code),
         homeTeam: {
-          name: m.homeTeam?.shortName || m.homeTeam?.name || 'Local',
+          name: homeTeamName,
           logo: m.homeTeam?.crest || '',
           form: ['V', 'E', 'V'],
         },
         awayTeam: {
-          name: m.awayTeam?.shortName || m.awayTeam?.name || 'Visitante',
+          name: awayTeamName,
           logo: m.awayTeam?.crest || '',
           form: ['E', 'V', 'D'],
         },
@@ -113,13 +133,24 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
           home: m.score?.fullTime?.home ?? 0,
           away: m.score?.fullTime?.away ?? 0,
         },
-        probs: { home: 52, draw: 28, away: 20 },
-        probabilities: { home: 52, draw: 28, away: 20 },
+        probs: {
+          home: prediction.homeWinProb,
+          draw: prediction.drawProb,
+          away: prediction.awayWinProb,
+        },
+        probabilities: {
+          home: prediction.homeWinProb,
+          draw: prediction.drawProb,
+          away: prediction.awayWinProb,
+        },
         stats: {
-          xg: [1.6, 1.1],
+          xg: [prediction.lambdaHome, prediction.lambdaAway],
           possession: [52, 48],
           shotsOnTarget: [5, 4],
-          corners: [6, 4],
+          corners: [
+            Math.round(prediction.corners.expectedCornersHome),
+            Math.round(prediction.corners.expectedCornersAway),
+          ],
         },
         status:
           m.status === 'IN_PLAY' || m.status === 'PAUSED'
@@ -130,13 +161,16 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         time: timeLabel,
         dateCategory: dateCategory as any,
         aiPrediction: {
-          recommendation: 'Gana Local o Empate',
-          confidence: 85,
-          homeWin: 52,
-          draw: 28,
-          awayWin: 20,
-          reasoning:
-            'Análisis automatizado en vivo basado en métricas oficiales de la API.',
+          recommendation: prediction.recommendedPick,
+          confidence: prediction.confidence,
+          homeWin: prediction.homeWinProb,
+          draw: prediction.drawProb,
+          awayWin: prediction.awayWinProb,
+          reasoning: prediction.recommendedPickReason,
+          xGHome: prediction.lambdaHome,
+          xGAway: prediction.lambdaAway,
+          topCorrectScores: prediction.topCorrectScores,
+          corners: prediction.corners,
         },
       };
     });

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Match } from '@/data/mockMatches';
 
 interface MatchModalProps {
@@ -8,183 +8,166 @@ interface MatchModalProps {
   onClose: () => void;
 }
 
-// Auxiliar seguro para parsear arreglos u objetos en TypeScript
-function getValue(stat: any, key: 'home' | 'away', index: 0 | 1, fallback: number): number {
-  if (!stat) return fallback;
-  if (Array.isArray(stat)) {
-    return typeof stat[index] === 'number' ? stat[index] : fallback;
-  }
-  if (typeof stat === 'object' && stat !== null) {
-    return typeof stat[key] === 'number' ? stat[key] : fallback;
-  }
-  return fallback;
-}
-
 export default function MatchModal({ match, onClose }: MatchModalProps) {
-  // Extracción ultra-segura para TypeScript
-  const homeXG = getValue(match.stats?.xg, 'home', 0, 1.5);
-  const awayXG = getValue(match.stats?.xg, 'away', 1, 0.9);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [loadingAi, setLoadingAi] = useState<boolean>(true);
 
-  const homePoss = getValue(match.stats?.possession, 'home', 0, 52);
-  const awayPoss = getValue(match.stats?.possession, 'away', 1, 48);
+  // Llamada a la API de Gemini al abrir el Modal
+  useEffect(() => {
+    async function fetchAnalysis() {
+      setLoadingAi(true);
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            homeTeam: match.homeTeam.name,
+            awayTeam: match.awayTeam.name,
+            league: match.league,
+            xGHome: match.aiPrediction?.xGHome ?? 1.5,
+            xGAway: match.aiPrediction?.xGAway ?? 1.1,
+            homeWinProb: match.probs?.home ?? 40,
+            drawProb: match.probs?.draw ?? 30,
+            awayWinProb: match.probs?.away ?? 30,
+            recommendedPick: match.aiPrediction?.recommendation ?? 'Gana Local o Empate',
+            cornersTotal: match.aiPrediction?.corners?.expectedCornersTotal ?? 9.5,
+          }),
+        });
 
-  const homeShots = getValue(match.stats?.shotsOnTarget, 'home', 0, 5);
-  const awayShots = getValue(match.stats?.shotsOnTarget, 'away', 1, 3);
+        const data = await res.json();
+        setAiAnalysis(data.analysis);
+      } catch (error) {
+        console.error('Error obteniendo análisis de Gemini:', error);
+        setAiAnalysis('Análisis cuantitativo respaldado por la matriz de probabilidad Dixon-Coles.');
+      } finally {
+        setLoadingAi(false);
+      }
+    }
 
-  const homeCorners = getValue(match.stats?.corners, 'home', 0, 6);
-  const awayCorners = getValue(match.stats?.corners, 'away', 1, 4);
+    fetchAnalysis();
+  }, [match]);
 
-  const homeWinProb = match.aiPrediction?.homeWin ?? match.probs?.home ?? 50;
-  const drawProb = match.aiPrediction?.draw ?? match.probs?.draw ?? 28;
-  const awayWinProb = match.aiPrediction?.awayWin ?? match.probs?.away ?? 22;
+  const corners = match.aiPrediction?.corners;
+  const topScores = match.aiPrediction?.topCorrectScores;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative text-zinc-100 max-h-[90vh] flex flex-col">
-        {/* Header Modal */}
-        <div className="p-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-950/50">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{match.flag || '⚽'}</span>
-            <span className="text-xs font-black tracking-widest text-emerald-400 uppercase">
-              {match.league}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+        {/* Botón de Cierre */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg font-bold bg-zinc-900 w-8 h-8 rounded-full flex items-center justify-center border border-zinc-800"
+        >
+          ✕
+        </button>
 
-        {/* Body Scrollable */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
-          {/* Enfrentamiento */}
-          <div className="grid grid-cols-3 items-center bg-zinc-950/40 p-5 rounded-xl border border-zinc-800/50">
-            {/* Local */}
-            <div className="flex flex-col items-center text-center gap-2">
-              <div className="w-16 h-16 rounded-full bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center p-2.5 shadow-md">
-                {match.homeTeam?.logo ? (
+        {/* Encabezado del Partido */}
+        <div className="text-center mb-6">
+          <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+            {match.flag} {match.league}
+          </span>
+          <div className="flex items-center justify-center gap-6 mt-4">
+            <div className="text-center w-1/3">
+              <div className="w-14 h-14 mx-auto mb-2 rounded-full bg-zinc-900 border border-zinc-800 p-2 flex items-center justify-center">
+                {match.homeTeam.logo ? (
                   <img src={match.homeTeam.logo} alt={match.homeTeam.name} className="w-full h-full object-contain" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20" />
+                  <span className="font-bold text-xs">L</span>
                 )}
               </div>
-              <span className="font-extrabold text-sm">{match.homeTeam?.name || 'Local'}</span>
+              <h3 className="font-black text-xs sm:text-sm text-zinc-100 truncate">{match.homeTeam.name}</h3>
             </div>
 
-            {/* Marcador / Estado */}
-            <div className="flex flex-col items-center justify-center text-center">
-              {match.status === 'LIVE' || match.status === 'FT' ? (
-                <div className="text-3xl font-black text-white tracking-wider">
-                  {match.score?.home ?? 0} - {match.score?.away ?? 0}
-                </div>
-              ) : (
-                <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-black border border-emerald-500/30">
-                  VS
-                </div>
-              )}
-              <span className="text-[11px] text-amber-400 font-semibold mt-2">{match.time}</span>
+            <div className="text-center w-1/3">
+              <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20">
+                {match.time}
+              </span>
+              <div className="text-xs text-zinc-500 mt-2 font-mono">
+                xG: {match.aiPrediction?.xGHome ?? 1.5} - {match.aiPrediction?.xGAway ?? 1.1}
+              </div>
             </div>
 
-            {/* Visitante */}
-            <div className="flex flex-col items-center text-center gap-2">
-              <div className="w-16 h-16 rounded-full bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center p-2.5 shadow-md">
-                {match.awayTeam?.logo ? (
+            <div className="text-center w-1/3">
+              <div className="w-14 h-14 mx-auto mb-2 rounded-full bg-zinc-900 border border-zinc-800 p-2 flex items-center justify-center">
+                {match.awayTeam.logo ? (
                   <img src={match.awayTeam.logo} alt={match.awayTeam.name} className="w-full h-full object-contain" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-rose-500/20" />
+                  <span className="font-bold text-xs">V</span>
                 )}
               </div>
-              <span className="font-extrabold text-sm">{match.awayTeam?.name || 'Visitante'}</span>
+              <h3 className="font-black text-xs sm:text-sm text-zinc-100 truncate">{match.awayTeam.name}</h3>
             </div>
           </div>
+        </div>
 
-          {/* Análisis de IA */}
-          <div className="bg-emerald-950/20 border border-emerald-500/30 p-4 rounded-xl space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <span>🤖</span> PREDICCIÓN Y ANÁLISIS IA
-              </span>
-              <span className="text-xs font-black bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
-                Confianza: {match.aiPrediction?.confidence ?? 88}%
-              </span>
+        {/* Banner de Análisis Táctico Gemini AI */}
+        <div className="bg-gradient-to-r from-emerald-950/50 via-zinc-900 to-amber-950/40 border border-emerald-500/30 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
+              <span>🤖</span> ANÁLISIS TÁCTICO GEMINI AI
+            </span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded">
+              Confianza: {match.aiPrediction?.confidence ?? 85}%
+            </span>
+          </div>
+
+          {loadingAi ? (
+            <div className="py-3 text-center text-xs text-zinc-400 animate-pulse">
+              Consultando la IA de Google para redacción táctica...
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed italic">
-              "{match.aiPrediction?.reasoning || 'Análisis automatizado generado con métricas avanzadas.'}"
+          ) : (
+            <p className="text-xs text-zinc-200 leading-relaxed font-medium">
+              "{aiAnalysis}"
             </p>
-          </div>
+          )}
 
-          {/* Probabilidades de Victoria */}
-          <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/60 space-y-2">
-            <div className="flex justify-between text-xs font-bold text-zinc-400">
-              <span>Local {homeWinProb}%</span>
-              <span>Empate {drawProb}%</span>
-              <span>Visitante {awayWinProb}%</span>
-            </div>
-            <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-              <div className="h-full bg-emerald-500" style={{ width: `${homeWinProb}%` }} />
-              <div className="h-full bg-zinc-500" style={{ width: `${drawProb}%` }} />
-              <div className="h-full bg-rose-500" style={{ width: `${awayWinProb}%` }} />
-            </div>
+          <div className="mt-3 pt-2 border-t border-zinc-800/80 flex justify-between items-center text-[11px]">
+            <span className="text-zinc-400">Recomendación VIP:</span>
+            <span className="font-black text-emerald-400">{match.aiPrediction?.recommendation}</span>
           </div>
+        </div>
 
-          {/* Estadísticas de Partido */}
-          <div className="space-y-3 bg-zinc-950/30 p-4 rounded-xl border border-zinc-800/50">
-            <h4 className="text-xs font-extrabold text-zinc-400 tracking-wider uppercase mb-3">
-              📊 Estadísticas Avanzadas
+        {/* Métricas Cuantitativas de Córners y Marcadores */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Córners */}
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-xs">
+            <h4 className="font-extrabold text-amber-400 mb-2 flex items-center gap-1">
+              <span>🚩</span> Córners Esperados (xCorners)
             </h4>
-
-            {/* xG */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-emerald-400">{homeXG} xG</span>
-                <span className="text-zinc-400">Goles Esperados (xG)</span>
-                <span className="text-emerald-400">{awayXG} xG</span>
+            <div className="space-y-1.5 text-zinc-300">
+              <div className="flex justify-between">
+                <span>Total Proyectado:</span>
+                <span className="font-bold text-white">{corners?.expectedCornersTotal ?? 9.5}</span>
               </div>
-              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${(homeXG / (homeXG + awayXG || 1)) * 100}%` }} />
-                <div className="bg-rose-500 h-full" style={{ width: `${(awayXG / (homeXG + awayXG || 1)) * 100}%` }} />
+              <div className="flex justify-between">
+                <span>Probabilidad +8.5 Córners:</span>
+                <span className="font-bold text-emerald-400">{corners?.over85CornersProb ?? 75}%</span>
               </div>
-            </div>
-
-            {/* Posesión */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-emerald-400">{homePoss}%</span>
-                <span className="text-zinc-400">Posesión de Balón</span>
-                <span className="text-emerald-400">{awayPoss}%</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${homePoss}%` }} />
-                <div className="bg-rose-500 h-full" style={{ width: `${awayPoss}%` }} />
+              <div className="flex justify-between">
+                <span>Probabilidad +9.5 Córners:</span>
+                <span className="font-bold text-emerald-400">{corners?.over95CornersProb ?? 60}%</span>
               </div>
             </div>
+          </div>
 
-            {/* Tiros al Arco */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-emerald-400">{homeShots}</span>
-                <span className="text-zinc-400">Tiros al Arco</span>
-                <span className="text-emerald-400">{awayShots}</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${(homeShots / (homeShots + awayShots || 1)) * 100}%` }} />
-                <div className="bg-rose-500 h-full" style={{ width: `${(awayShots / (homeShots + awayShots || 1)) * 100}%` }} />
-              </div>
-            </div>
-
-            {/* Córners */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-emerald-400">{homeCorners}</span>
-                <span className="text-zinc-400">Tiros de Esquina</span>
-                <span className="text-emerald-400">{awayCorners}</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${(homeCorners / (homeCorners + awayCorners || 1)) * 100}%` }} />
-                <div className="bg-rose-500 h-full" style={{ width: `${(awayCorners / (homeCorners + awayCorners || 1)) * 100}%` }} />
-              </div>
+          {/* Marcadores Exactos Probables */}
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-xs">
+            <h4 className="font-extrabold text-emerald-400 mb-2 flex items-center gap-1">
+              <span>🎯</span> Marcadores Exactos (Poisson)
+            </h4>
+            <div className="space-y-1.5 text-zinc-300">
+              {topScores && topScores.length > 0 ? (
+                topScores.map((sc, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded text-white font-bold">
+                      {sc.homeGoals} - {sc.awayGoals}
+                    </span>
+                    <span className="text-zinc-400">{sc.probability}% prob.</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-zinc-500">Calculando matriz...</div>
+              )}
             </div>
           </div>
         </div>

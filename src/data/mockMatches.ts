@@ -12,6 +12,24 @@ export interface MatchStats {
   fouls?: number[];
 }
 
+export interface CorrectScoreProb {
+  homeGoals: number;
+  awayGoals: number;
+  probability: number;
+}
+
+export interface CornerPredictionStats {
+  expectedCornersHome: number;
+  expectedCornersAway: number;
+  expectedCornersTotal: number;
+  over85CornersProb: number;
+  over95CornersProb: number;
+  over105CornersProb: number;
+  mostCornersHomeProb: number;
+  mostCornersDrawProb: number;
+  mostCornersAwayProb: number;
+}
+
 export interface Match {
   id: string;
   league: string;
@@ -43,6 +61,10 @@ export interface Match {
     draw: number;
     awayWin: number;
     reasoning: string;
+    xGHome?: number;
+    xGAway?: number;
+    topCorrectScores?: CorrectScoreProb[];
+    corners?: CornerPredictionStats;
   };
 }
 
@@ -66,7 +88,7 @@ export const MOCK_MATCHES: Match[] = [
     probabilities: { home: 58, draw: 24, away: 18 },
     stats: { xg: [1.8, 0.9], possession: [58, 42], shotsOnTarget: [6, 3], corners: [7, 4] },
     status: 'LIVE',
-    time: 'EN VIVO - 68\'',
+    time: "EN VIVO - 68'",
     dateCategory: 'PROXIMOS',
     aiPrediction: {
       recommendation: 'Gana Local o Empate',
