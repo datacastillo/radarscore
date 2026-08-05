@@ -8,12 +8,25 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch('https://api.football-data.org/v4/matches', {
-      headers: {
-        'X-Auth-Token': API_KEY,
-      },
-      next: { revalidate: 60 },
-    });
+    // Calculamos el rango de fechas: Ayer, Hoy y Mañana
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const dateFrom = yesterday.toISOString().split('T')[0];
+    const dateTo = tomorrow.toISOString().split('T')[0];
+
+    const res = await fetch(
+      `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
+      {
+        headers: {
+          'X-Auth-Token': API_KEY,
+        },
+        next: { revalidate: 60 },
+      }
+    );
 
     if (!res.ok) {
       return NextResponse.json({ error: `Error API externa: ${res.status}` }, { status: res.status });

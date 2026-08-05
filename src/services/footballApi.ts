@@ -1,5 +1,20 @@
 import { Match } from '@/data/mockMatches';
 
+function calculateDateCategory(utcDateString: string): 'AYER' | 'HOY' | 'MAÑANA' {
+  const matchDate = new Date(utcDateString);
+  const today = new Date();
+
+  const matchDay = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate());
+  const currentDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const diffTime = matchDay.getTime() - currentDay.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+
+  if (diffDays < 0) return 'AYER';
+  if (diffDays > 0) return 'MAÑANA';
+  return 'HOY';
+}
+
 export async function fetchRealMatches(): Promise<Match[]> {
   try {
     const res = await fetch('/api/matches');
@@ -16,13 +31,14 @@ export async function fetchRealMatches(): Promise<Match[]> {
     return data.matches.map((m: any) => {
       const isLive = m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'HALF_TIME';
       const isFinished = m.status === 'FINISHED';
+      const dateCat = calculateDateCategory(m.utcDate);
 
       return {
         id: m.id.toString(),
         league: m.competition?.name?.toUpperCase() || 'FÚTBOL INTERNACIONAL',
         flag: m.competition?.emblem ? '⚽' : '🌍',
         status: isLive ? 'LIVE' : isFinished ? 'FINISHED' : 'SCHEDULED',
-        dateCategory: 'HOY',
+        dateCategory: dateCat,
         minute: isLive ? 45 : undefined,
         time: new Date(m.utcDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         homeTeam: {
