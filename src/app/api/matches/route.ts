@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-// Fuerza a Vercel a calcular las fechas en cada petición y no durante el build
+// Fuerza a Vercel/Next.js a calcular las fechas en tiempo real en cada petición y no durante el build
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
 
   if (!API_KEY) {
     return NextResponse.json(
-      { error: 'No se encontró la API Key en las variables de entorno' },
+      { matches: [], error: 'No se encontró la API Key en las variables de entorno' },
       { status: 500 }
     );
   }
@@ -32,7 +32,7 @@ export async function GET() {
   const dateFrom = formatDate(pastDate);
   const dateTo = formatDate(futureDate);
 
-  // Ligas principales habilitadas en la API
+  // Ligas principales habilitadas en la API (Premier, LaLiga, Champions, Bundesliga, Serie A, Eredivisie, Primeira Liga)
   const competitions = 'PL,PD,CL,BL1,SA,DED,PPL';
 
   try {
@@ -42,12 +42,15 @@ export async function GET() {
       headers: {
         'X-Auth-Token': API_KEY,
       },
-      next: { revalidate: 300 }, // Caché interna de 5 minutos
+      next: { revalidate: 300 }, // Caché de 5 minutos
     });
 
     if (!res.ok) {
-      console.error('Error desde football-data:', res.status, res.statusText);
-      return NextResponse.json({ matches: [] });
+      console.error('Error desde API football-data:', res.status, res.statusText);
+      return NextResponse.json(
+        { matches: [], error: `Error de la API (${res.status})` },
+        { status: 200 }
+      );
     }
 
     const data = await res.json();
@@ -55,8 +58,8 @@ export async function GET() {
   } catch (error) {
     console.error('Error de servidor en API matches:', error);
     return NextResponse.json(
-      { error: 'Error al obtener partidos' },
-      { status: 500 }
+      { matches: [], error: 'Error al procesar los partidos en el servidor' },
+      { status: 200 }
     );
   }
 }
