@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 
+// Caché en memoria para evitar solicitudes duplicadas a Google API
+const analysisCache = new Map<string, { text: string; timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutos de vigencia
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -15,11 +19,18 @@ export async function POST(req: Request) {
     const recommendedPick = body.recommendedPick || 'Gana Local o Empate';
     const cornersTotal = body.cornersTotal ?? 9.5;
 
-    // Obtención de la clave de entorno limpia
+    // Generar una clave única para el partido
+    const cacheKey = `${homeTeam}-${awayTeam}-${league}`;
+    const cachedEntry = analysisCache.get(cacheKey);
+
+    // Si el análisis ya fue generado hace menos de 30 minutos, se sirve desde caché
+    if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_TTL) {
+      return NextResponse.json({ analysis: cachedEntry.text });
+    }
+
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
     if (!apiKey) {
-      console.warn('⚠️ GEMINI_API_KEY no encontrada en las variables de entorno.');
       return NextResponse.json({
         analysis: `El modelo cuantitativo proyecta un xG de ${xGHome} vs ${xGAway} con ${cornersTotal} córners esperados, sustentando la selección de "${recommendedPick}".`,
       });
@@ -38,45 +49,46 @@ Escribe un análisis táctico conciso en español de MÁXIMO 2 ORACIONES (entre 
 Explica de forma técnica y profesional por qué la recomendación ("${recommendedPick}") tiene sentido basándote en el xG y el ritmo proyectado del juego.
 Sé directo al grano. No uses saludos ni introducciones.`;
 
-    // Endpoint REST de Gemini
-    const googleApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    const modelsToTry = [
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
+    ];
 
-    const response = await fetch(googleApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey, // 👈 Envío seguro mediante cabecera HTTP
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: promptText }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 150,
+    let response: Response | null = null;
+
+    for (const url of modelsToTry) {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`❌ Error en respuesta de Google API (${response.status}):`, errorBody);
-
-      return NextResponse.json({
-        analysis: `El modelo cuantitativo proyecta un xG de ${xGHome} vs ${xGAway}, respaldando la recomendación de "${recommendedPick}".`,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 150,
+          },
+        }),
       });
+
+      if (response.ok) break;
+    }
+
+    if (!response || !response.ok) {
+      const fallbackAnalysis = `El modelo cuantitativo proyecta un xG de ${xGHome} vs ${xGAway}, respaldando la recomendación de "${recommendedPick}".`;
+      return NextResponse.json({ analysis: fallbackAnalysis });
     }
 
     const data = await response.json();
-    const textAnalysis = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const textAnalysis =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+      `El modelo cuantitativo proyecta un xG de ${xGHome} vs ${xGAway}, justificando tácticamente la selección de "${recommendedPick}".`;
 
-    return NextResponse.json({
-      analysis:
-        textAnalysis ||
-        `El modelo cuantitativo proyecta un xG de ${xGHome} vs ${xGAway}, justificando tácticamente la selección de "${recommendedPick}".`,
-    });
+    // Guardar en la caché
+    analysisCache.set(cacheKey, { text: textAnalysis, timestamp: Date.now() });
+
+    return NextResponse.json({ analysis: textAnalysis });
   } catch (error) {
     console.error('❌ Error general en Endpoint /api/analyze:', error);
     return NextResponse.json({
