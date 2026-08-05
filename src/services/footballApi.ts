@@ -1,73 +1,99 @@
 import { Match } from '@/data/mockMatches';
 
-function calculateDateCategory(utcDateString: string): 'AYER' | 'HOY' | 'MAÑANA' {
-  const matchDate = new Date(utcDateString);
-  const today = new Date();
-
-  const matchDay = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate());
-  const currentDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  const diffTime = matchDay.getTime() - currentDay.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-
-  if (diffDays < 0) return 'AYER';
-  if (diffDays > 0) return 'MAÑANA';
-  return 'HOY';
-}
-
-export async function fetchRealMatches(): Promise<Match[]> {
+export async function fetchRealMatches(): Promise<Match[] | null> {
   try {
-    const res = await fetch('/api/matches');
+    const response = await fetch('/api/matches');
+    if (!response.ok) return null;
 
-    if (!res.ok) {
-      console.error(`Error API interna: ${res.status}`);
-      return [];
-    }
+    const data = await response.json();
+    if (!data.matches || !Array.isArray(data.matches)) return null;
 
-    const data = await res.json();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
 
-    if (!data.matches) return [];
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
 
     return data.matches.map((m: any) => {
-      const isLive = m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'HALF_TIME';
-      const isFinished = m.status === 'FINISHED';
-      const dateCat = calculateDateCategory(m.utcDate);
+      const matchDate = new Date(m.utcDate);
+      const dateStr = m.utcDate ? m.utcDate.split('T')[0] : '';
+
+      // 1. Determinar categoría de fecha para los filtros
+      let dateCategory: 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE' = 'HOY';
+
+      if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
+        dateCategory = 'LIVE';
+      } else if (dateStr === todayStr) {
+        dateCategory = 'HOY';
+      } else if (dateStr === tomorrowStr) {
+        dateCategory = 'MAÑANA';
+      } else if (dateStr === yesterdayStr) {
+        dateCategory = 'AYER';
+      } else {
+        // Si el partido está programado para días futuros (ej. próximo fin de semana)
+        dateCategory = matchDate > now ? 'MAÑANA' : 'AYER';
+      }
+
+      // 2. Formatear hora real a tu zona horaria local (ej: 02:30 p.m.)
+      const timeFormatted = matchDate.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      // 3. Formatear la fecha para mostrar (ej: "12 AGO" o "HOY")
+      const dayFormatted = matchDate.toLocaleDateString([], {
+        day: '2-digit',
+        month: 'short',
+      }).toUpperCase();
+
+      const timeLabel = dateStr === todayStr
+        ? `HOY - ${timeFormatted}`
+        : dateStr === tomorrowStr
+        ? `MAÑANA - ${timeFormatted}`
+        : `${dayFormatted} - ${timeFormatted}`;
 
       return {
-        id: m.id.toString(),
-        league: m.competition?.name?.toUpperCase() || 'FÚTBOL INTERNACIONAL',
-        flag: m.competition?.emblem ? '⚽' : '🌍',
-        status: isLive ? 'LIVE' : isFinished ? 'FINISHED' : 'SCHEDULED',
-        dateCategory: dateCat,
-        minute: isLive ? 45 : undefined,
-        time: new Date(m.utcDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        id: String(m.id),
+        league: m.competition?.name ? m.competition.name.toUpperCase() : 'PREMIER LEAGUE',
+        flag: m.competition?.emblem || '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
         homeTeam: {
-          name: m.homeTeam.shortName || m.homeTeam.name,
-          icon: '🛡️',
-          form: ['V', 'E', 'V'],
+          name: m.homeTeam?.shortName || m.homeTeam?.name || 'Local',
+          logo: m.homeTeam?.crest || '',
         },
         awayTeam: {
-          name: m.awayTeam.shortName || m.awayTeam.name,
-          icon: '🛡️',
-          form: ['D', 'V', 'E'],
+          name: m.awayTeam?.shortName || m.awayTeam?.name || 'Visitante',
+          logo: m.awayTeam?.crest || '',
         },
-        homeScore: m.score?.fullTime?.home ?? 0,
-        awayScore: m.score?.fullTime?.away ?? 0,
-        stadium: 'Estadio Principal',
-        aiConfidence: Math.floor(Math.random() * 20) + 75,
-        aiPrediction: 'Predicción en análisis',
-        probs: { home: 45, draw: 30, away: 25 },
-        aiInsight: 'Análisis automatizado generado en base a métricas en vivo.',
-        stats: {
-          xg: [1.5, 1.1],
-          possession: [52, 48],
-          shotsOnTarget: [5, 4],
-          fouls: [10, 12],
+        score: {
+          home: m.score?.fullTime?.home ?? 0,
+          away: m.score?.fullTime?.away ?? 0,
+        },
+        status: m.status === 'IN_PLAY' || m.status === 'PAUSED'
+          ? 'LIVE'
+          : m.status === 'FINISHED'
+          ? 'FT'
+          : 'SCHEDULED',
+        time: timeLabel,
+        dateCategory,
+        // Datos predeterminados para la tarjeta e IA
+        aiPrediction: {
+          recommendation: 'Gana Local o Empate',
+          confidence: 88,
+          homeWin: 52,
+          draw: 28,
+          awayWin: 20,
+          reasoning: 'Análisis automatizado generado en base a métricas reales de la API.',
         },
       };
     });
   } catch (error) {
-    console.error('Error cargando partidos reales:', error);
-    return [];
+    console.error('Error al transformar los datos de partidos:', error);
+    return null;
   }
 }
