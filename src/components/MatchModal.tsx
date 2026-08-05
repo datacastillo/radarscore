@@ -1,97 +1,181 @@
+'use client';
+
+import React from 'react';
 import { Match } from '@/data/mockMatches';
 
-export default function MatchModal({ match, onClose }: { match: Match | null; onClose: () => void }) {
-  if (!match) return null;
+interface MatchModalProps {
+  match: Match;
+  onClose: () => void;
+}
+
+export default function MatchModal({ match, onClose }: MatchModalProps) {
+  // Fallbacks de estadísticas ultraseguros
+  const homeXG = match.stats?.xg?.[0] ?? 1.5;
+  const awayXG = match.stats?.xg?.[1] ?? 0.9;
+
+  const homePoss = match.stats?.possession?.[0] ?? (typeof match.stats?.possession === 'object' ? match.stats.possession.home : 52);
+  const awayPoss = match.stats?.possession?.[1] ?? (typeof match.stats?.possession === 'object' ? match.stats.possession.away : 48);
+
+  const homeShots = match.stats?.shotsOnTarget?.[0] ?? 5;
+  const awayShots = match.stats?.shotsOnTarget?.[1] ?? 3;
+
+  const homeCorners = match.stats?.corners?.[0] ?? 6;
+  const awayCorners = match.stats?.corners?.[1] ?? 4;
+
+  const homeWinProb = match.aiPrediction?.homeWin ?? match.probs?.home ?? 50;
+  const drawProb = match.aiPrediction?.draw ?? match.probs?.draw ?? 28;
+  const awayWinProb = match.aiPrediction?.awayWin ?? match.probs?.away ?? 22;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#121215] border border-white/10 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl animate-in fade-in zoom-in duration-200">
-        
-        {/* Botón Cerrar */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-800 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all"
-        >
-          ✕
-        </button>
-
-        {/* Encabezado */}
-        <div className="text-center mb-6">
-          <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase bg-zinc-800 px-3 py-1 rounded-full border border-white/5">
-            {match.flag} {match.league}
-          </span>
-          <h2 className="text-xl font-bold mt-3 text-white">Análisis Avanzado IA</h2>
-          <p className="text-xs text-zinc-400">{match.stadium}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative text-zinc-100 max-h-[90vh] flex flex-col">
+        {/* Header Modal */}
+        <div className="p-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-950/50">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{match.flag || '⚽'}</span>
+            <span className="text-xs font-black tracking-widest text-emerald-400 uppercase">
+              {match.league}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Marcador */}
-        <div className="flex items-center justify-between my-6 px-4">
-          <div className="text-center">
-            <div className="text-3xl mb-1">{match.homeTeam.icon}</div>
-            <p className="font-bold text-sm">{match.homeTeam.name}</p>
+        {/* Body Scrollable */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
+          {/* Enfrentamiento */}
+          <div className="grid grid-cols-3 items-center bg-zinc-950/40 p-5 rounded-xl border border-zinc-800/50">
+            {/* Local */}
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-16 h-16 rounded-full bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center p-2.5 shadow-md">
+                {match.homeTeam?.logo ? (
+                  <img src={match.homeTeam.logo} alt={match.homeTeam.name} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20" />
+                )}
+              </div>
+              <span className="font-extrabold text-sm">{match.homeTeam?.name || 'Local'}</span>
+            </div>
+
+            {/* Marcador / Estado */}
+            <div className="flex flex-col items-center justify-center text-center">
+              {match.status === 'LIVE' || match.status === 'FT' ? (
+                <div className="text-3xl font-black text-white tracking-wider">
+                  {match.score?.home ?? 0} - {match.score?.away ?? 0}
+                </div>
+              ) : (
+                <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-black border border-emerald-500/30">
+                  VS
+                </div>
+              )}
+              <span className="text-[11px] text-amber-400 font-semibold mt-2">{match.time}</span>
+            </div>
+
+            {/* Visitante */}
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-16 h-16 rounded-full bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center p-2.5 shadow-md">
+                {match.awayTeam?.logo ? (
+                  <img src={match.awayTeam.logo} alt={match.awayTeam.name} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-rose-500/20" />
+                )}
+              </div>
+              <span className="font-extrabold text-sm">{match.awayTeam?.name || 'Visitante'}</span>
+            </div>
           </div>
 
-          <div className="text-center">
-            {match.status !== 'SCHEDULED' ? (
-              <span className="text-3xl font-black">{match.homeScore} - {match.awayScore}</span>
-            ) : (
-              <span className="text-lg font-bold text-emerald-400">{match.time}</span>
-            )}
-            <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase">{match.status}</p>
+          {/* Análisis de IA */}
+          <div className="bg-emerald-950/20 border border-emerald-500/30 p-4 rounded-xl space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <span>🤖</span> PREDICCIÓN Y ANÁLISIS IA
+              </span>
+              <span className="text-xs font-black bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+                Confianza: {match.aiPrediction?.confidence ?? 88}%
+              </span>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed italic">
+              "{match.aiPrediction?.reasoning || 'Análisis automatizado generado con métricas avanzadas.'}"
+            </p>
           </div>
 
-          <div className="text-center">
-            <div className="text-3xl mb-1">{match.awayTeam.icon}</div>
-            <p className="font-bold text-sm">{match.awayTeam.name}</p>
+          {/* Probabilidades de Victoria */}
+          <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/60 space-y-2">
+            <div className="flex justify-between text-xs font-bold text-zinc-400">
+              <span>Local {homeWinProb}%</span>
+              <span>Empate {drawProb}%</span>
+              <span>Visitante {awayWinProb}%</span>
+            </div>
+            <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+              <div className="h-full bg-emerald-500" style={{ width: `${homeWinProb}%` }} />
+              <div className="h-full bg-zinc-500" style={{ width: `${drawProb}%` }} />
+              <div className="h-full bg-rose-500" style={{ width: `${awayWinProb}%` }} />
+            </div>
           </div>
-        </div>
 
-        {/* Estadísticas Comparativas */}
-        {match.stats && (
-          <div className="space-y-4 my-6 bg-zinc-900/50 p-4 rounded-xl border border-white/5">
-            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider text-center mb-3">Métricas del Partido</h3>
-            
+          {/* Estadísticas de Partido (xG, Posesión, Tiros, Córners) */}
+          <div className="space-y-3 bg-zinc-950/30 p-4 rounded-xl border border-zinc-800/50">
+            <h4 className="text-xs font-extrabold text-zinc-400 tracking-wider uppercase mb-3">
+              📊 Estadísticas Avanzadas
+            </h4>
+
             {/* xG */}
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-emerald-400">{match.stats.xg[0]} xG</span>
+                <span className="text-emerald-400">{homeXG} xG</span>
                 <span className="text-zinc-400">Goles Esperados (xG)</span>
-                <span className="text-emerald-400">{match.stats.xg[1]} xG</span>
+                <span className="text-emerald-400">{awayXG} xG</span>
               </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full flex overflow-hidden">
-                <div className="bg-emerald-500" style={{ width: `${(match.stats.xg[0] / (match.stats.xg[0] + match.stats.xg[1])) * 100}%` }}></div>
-                <div className="bg-emerald-400/30" style={{ width: `${(match.stats.xg[1] / (match.stats.xg[0] + match.stats.xg[1])) * 100}%` }}></div>
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                <div className="bg-emerald-500 h-full" style={{ width: `${(homeXG / (homeXG + awayXG)) * 100}%` }} />
+                <div className="bg-rose-500 h-full" style={{ width: `${(awayXG / (homeXG + awayXG)) * 100}%` }} />
               </div>
             </div>
 
             {/* Posesión */}
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
-                <span>{match.stats.possession[0]}%</span>
+                <span className="text-emerald-400">{homePoss}%</span>
                 <span className="text-zinc-400">Posesión de Balón</span>
-                <span>{match.stats.possession[1]}%</span>
+                <span className="text-emerald-400">{awayPoss}%</span>
               </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full flex overflow-hidden">
-                <div className="bg-zinc-400" style={{ width: `${match.stats.possession[0]}%` }}></div>
-                <div className="bg-zinc-600" style={{ width: `${match.stats.possession[1]}%` }}></div>
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                <div className="bg-emerald-500 h-full" style={{ width: `${homePoss}%` }} />
+                <div className="bg-rose-500 h-full" style={{ width: `${awayPoss}%` }} />
               </div>
             </div>
 
-            {/* Tiros a puerta */}
-            <div className="flex justify-between text-xs font-semibold text-zinc-300 pt-2 border-t border-white/5">
-              <span>{match.stats.shotsOnTarget[0]}</span>
-              <span className="text-zinc-500">Tiros al Arco</span>
-              <span>{match.stats.shotsOnTarget[1]}</span>
+            {/* Tiros al Arco */}
+            <div>
+              <div className="flex justify-between text-xs font-semibold mb-1">
+                <span className="text-emerald-400">{homeShots}</span>
+                <span className="text-zinc-400">Tiros al Arco</span>
+                <span className="text-emerald-400">{awayShots}</span>
+              </div>
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                <div className="bg-emerald-500 h-full" style={{ width: `${(homeShots / (homeShots + awayShots || 1)) * 100}%` }} />
+                <div className="bg-rose-500 h-full" style={{ width: `${(awayShots / (homeShots + awayShots || 1)) * 100}%` }} />
+              </div>
+            </div>
+
+            {/* Córners */}
+            <div>
+              <div className="flex justify-between text-xs font-semibold mb-1">
+                <span className="text-emerald-400">{homeCorners}</span>
+                <span className="text-zinc-400">Tiros de Esquina</span>
+                <span className="text-emerald-400">{awayCorners}</span>
+              </div>
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                <div className="bg-emerald-500 h-full" style={{ width: `${(homeCorners / (homeCorners + awayCorners || 1)) * 100}%` }} />
+                <div className="bg-rose-500 h-full" style={{ width: `${(awayCorners / (homeCorners + awayCorners || 1)) * 100}%` }} />
+              </div>
             </div>
           </div>
-        )}
-
-        {/* Conclusión IA */}
-        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl text-xs">
-          <p className="text-emerald-400 font-bold mb-1">🤖 Dictamen del Algoritmo:</p>
-          <p className="text-zinc-300 italic">"{match.aiInsight}"</p>
         </div>
-
       </div>
     </div>
   );
