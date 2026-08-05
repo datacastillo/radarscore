@@ -8,19 +8,31 @@ interface MatchModalProps {
   onClose: () => void;
 }
 
+// Auxiliar seguro para parsear arreglos u objetos en TypeScript
+function getValue(stat: any, key: 'home' | 'away', index: 0 | 1, fallback: number): number {
+  if (!stat) return fallback;
+  if (Array.isArray(stat)) {
+    return typeof stat[index] === 'number' ? stat[index] : fallback;
+  }
+  if (typeof stat === 'object' && stat !== null) {
+    return typeof stat[key] === 'number' ? stat[key] : fallback;
+  }
+  return fallback;
+}
+
 export default function MatchModal({ match, onClose }: MatchModalProps) {
-  // Fallbacks de estadísticas ultraseguros
-  const homeXG = match.stats?.xg?.[0] ?? 1.5;
-  const awayXG = match.stats?.xg?.[1] ?? 0.9;
+  // Extracción ultra-segura para TypeScript
+  const homeXG = getValue(match.stats?.xg, 'home', 0, 1.5);
+  const awayXG = getValue(match.stats?.xg, 'away', 1, 0.9);
 
-  const homePoss = match.stats?.possession?.[0] ?? (typeof match.stats?.possession === 'object' ? match.stats.possession.home : 52);
-  const awayPoss = match.stats?.possession?.[1] ?? (typeof match.stats?.possession === 'object' ? match.stats.possession.away : 48);
+  const homePoss = getValue(match.stats?.possession, 'home', 0, 52);
+  const awayPoss = getValue(match.stats?.possession, 'away', 1, 48);
 
-  const homeShots = match.stats?.shotsOnTarget?.[0] ?? 5;
-  const awayShots = match.stats?.shotsOnTarget?.[1] ?? 3;
+  const homeShots = getValue(match.stats?.shotsOnTarget, 'home', 0, 5);
+  const awayShots = getValue(match.stats?.shotsOnTarget, 'away', 1, 3);
 
-  const homeCorners = match.stats?.corners?.[0] ?? 6;
-  const awayCorners = match.stats?.corners?.[1] ?? 4;
+  const homeCorners = getValue(match.stats?.corners, 'home', 0, 6);
+  const awayCorners = getValue(match.stats?.corners, 'away', 1, 4);
 
   const homeWinProb = match.aiPrediction?.homeWin ?? match.probs?.home ?? 50;
   const drawProb = match.aiPrediction?.draw ?? match.probs?.draw ?? 28;
@@ -117,7 +129,7 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
             </div>
           </div>
 
-          {/* Estadísticas de Partido (xG, Posesión, Tiros, Córners) */}
+          {/* Estadísticas de Partido */}
           <div className="space-y-3 bg-zinc-950/30 p-4 rounded-xl border border-zinc-800/50">
             <h4 className="text-xs font-extrabold text-zinc-400 tracking-wider uppercase mb-3">
               📊 Estadísticas Avanzadas
@@ -131,8 +143,8 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
                 <span className="text-emerald-400">{awayXG} xG</span>
               </div>
               <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${(homeXG / (homeXG + awayXG)) * 100}%` }} />
-                <div className="bg-rose-500 h-full" style={{ width: `${(awayXG / (homeXG + awayXG)) * 100}%` }} />
+                <div className="bg-emerald-500 h-full" style={{ width: `${(homeXG / (homeXG + awayXG || 1)) * 100}%` }} />
+                <div className="bg-rose-500 h-full" style={{ width: `${(awayXG / (homeXG + awayXG || 1)) * 100}%` }} />
               </div>
             </div>
 
