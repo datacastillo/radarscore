@@ -11,7 +11,7 @@ export default function Home() {
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedLeagueForTable, setSelectedLeagueForTable] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA'>('MAÑANA');
+  const [selectedCategory, setSelectedCategory] = useState<'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA' | 'PRÓXIMOS'>('PRÓXIMOS');
   const [selectedLeague, setSelectedLeague] = useState<string>('TODAS');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,23 +34,21 @@ export default function Home() {
     'AYER': 'AYER',
     'HOY': 'HOY',
     'MAÑANA': 'MAÑANA',
+    'PRÓXIMOS': 'PROXIMOS',
   };
 
   const currentCategoryValue = categoryMap[selectedCategory];
 
-  // Comprobar si hay partidos estrictamente para la categoría seleccionada
-  const strictMatches = matches.filter((m) => m.dateCategory === currentCategoryValue);
-
-  // Si se selecciona MAÑANA u HOY y no hay partidos estrictos ese día, mostramos los PROXIMOS
-  const isShowingUpcomingFallback =
-    strictMatches.length === 0 && (selectedCategory === 'MAÑANA' || selectedCategory === 'HOY');
-
-  const matchesToFilter = isShowingUpcomingFallback
-    ? matches.filter((m) => (m.dateCategory as string) === 'PROXIMOS' || m.dateCategory === currentCategoryValue)
-    : strictMatches;
+  // Filtrado de partidos según la categoría seleccionada
+  const matchesByDate = matches.filter((m) => {
+    if (selectedCategory === 'PRÓXIMOS') {
+      return (m.dateCategory as string) === 'PROXIMOS' || m.dateCategory === 'MAÑANA';
+    }
+    return m.dateCategory === currentCategoryValue;
+  });
 
   // Filtrar por Liga y Búsqueda por texto
-  const filteredMatches = matchesToFilter.filter((m) => {
+  const filteredMatches = matchesByDate.filter((m) => {
     const matchesLeague =
       selectedLeague === 'TODAS' ||
       m.league.toLowerCase().includes(selectedLeague.toLowerCase());
@@ -75,15 +73,15 @@ export default function Home() {
           </h1>
         </div>
 
-        {/* Filtros de Fecha */}
-        <div className="flex bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs font-bold">
-          {(['EN VIVO', 'AYER', 'HOY', 'MAÑANA'] as const).map((cat) => (
+        {/* Filtros de Fecha con la opción PRÓXIMOS incorporada */}
+        <div className="flex bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs font-bold overflow-x-auto max-w-full scrollbar-none">
+          {(['EN VIVO', 'AYER', 'HOY', 'MAÑANA', 'PRÓXIMOS'] as const).map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${
                 selectedCategory === cat
-                  ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                  ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20 font-black'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -127,19 +125,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Banner Informativo si no hay partidos justo ese día */}
-      {isShowingUpcomingFallback && (
-        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-3">
-          <span className="text-lg">📅</span>
-          <div>
-            <p className="font-bold">No hay partidos programados para {selectedCategory.toLowerCase()}.</p>
-            <p className="text-zinc-400 text-[11px] mt-0.5">
-              Mostrando los próximos encuentros confirmados en el calendario oficial de la liga:
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Lista de Partidos */}
       {loading ? (
         <div className="py-20 text-center text-zinc-500 animate-pulse text-sm">
@@ -166,8 +151,13 @@ export default function Home() {
           ))}
         </div>
       ) : (
-        <div className="py-20 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800/50">
-          <p className="text-zinc-400 font-medium text-sm">No se encontraron partidos para este filtro.</p>
+        <div className="py-16 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800/50 p-6">
+          <p className="text-zinc-300 font-semibold text-sm">
+            No hay partidos programados para {selectedCategory.toLowerCase()}.
+          </p>
+          <p className="text-zinc-500 text-xs mt-2">
+            Haz clic en la pestaña <button onClick={() => setSelectedCategory('PRÓXIMOS')} className="text-emerald-400 font-bold underline">PRÓXIMOS</button> para consultar el calendario oficial.
+          </p>
         </div>
       )}
 
