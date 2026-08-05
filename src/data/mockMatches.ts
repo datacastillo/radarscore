@@ -14,6 +14,12 @@ export interface Match {
   aiPrediction: string;
   probs: { home: number; draw: number; away: number };
   aiInsight: string;
+  stats?: {
+    xg: [number, number];
+    possession: [number, number];
+    shotsOnTarget: [number, number];
+    fouls: [number, number];
+  };
 }
 
 export const MOCK_MATCHES: Match[] = [
@@ -32,6 +38,7 @@ export const MOCK_MATCHES: Match[] = [
     aiPrediction: 'Gana Local (58%)',
     probs: { home: 58, draw: 24, away: 18 },
     aiInsight: 'Arsenal invicto en casa (8/8). Chelsea concede un promedio de 1.8 goles jugando fuera.',
+    stats: { xg: [2.1, 0.9], possession: [62, 38], shotsOnTarget: [7, 3], fouls: [9, 14] }
   },
   {
     id: '2',
@@ -46,6 +53,7 @@ export const MOCK_MATCHES: Match[] = [
     aiPrediction: 'Empate o Visitante (62%)',
     probs: { home: 38, draw: 30, away: 32 },
     aiInsight: 'Clásico de alta intensidad. Ambos equipos anotan en el 90% de sus últimos 10 enfrentamientos.',
+    stats: { xg: [1.8, 1.7], possession: [50, 50], shotsOnTarget: [5, 6], fouls: [11, 10] }
   },
   {
     id: '3',
@@ -58,8 +66,9 @@ export const MOCK_MATCHES: Match[] = [
     awayScore: 1,
     stadium: 'Allianz Arena',
     aiConfidence: 91,
-    aiPrediction: 'Gana Local (Accertado)',
+    aiPrediction: 'Gana Local (Acertado)',
     probs: { home: 65, draw: 20, away: 15 },
     aiInsight: 'Predicción acertada. Dominio absoluto del Bayern en tiros a puerta durante el primer tiempo.',
+    stats: { xg: [3.4, 1.1], possession: [58, 42], shotsOnTarget: [10, 4], fouls: [8, 12] }
   },
 ];

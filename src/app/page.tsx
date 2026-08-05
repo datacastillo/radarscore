@@ -1,7 +1,13 @@
-import { MOCK_MATCHES } from '@/data/mockMatches';
+'use client';
+
+import { useState } from 'react';
+import { MOCK_MATCHES, Match } from '@/data/mockMatches';
 import MatchCard from '@/components/MatchCard';
+import MatchModal from '@/components/MatchModal';
 
 export default function Home() {
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
   return (
     <main className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-4 md:p-8 max-w-5xl mx-auto">
       {/* Header */}
@@ -23,15 +29,18 @@ export default function Home() {
       {/* Feed de Partidos */}
       <section className="space-y-6">
         {MOCK_MATCHES.map((match) => (
-          <div key={match.id}>
+          <div key={match.id} onClick={() => setSelectedMatch(match)} className="cursor-pointer">
             <div className="flex items-center justify-between text-xs font-bold text-zinc-400 tracking-wider uppercase border-l-2 border-emerald-500 pl-3 mb-3">
               <span>{match.flag} {match.league}</span>
-              <span className="text-emerald-400 hover:underline cursor-pointer">Ver Tabla 📊</span>
+              <span className="text-emerald-400 hover:underline">Ver Análisis 📊</span>
             </div>
             <MatchCard match={match} />
           </div>
         ))}
       </section>
+
+      {/* Modal Avanzado */}
+      <MatchModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />
     </main>
   );
 }
