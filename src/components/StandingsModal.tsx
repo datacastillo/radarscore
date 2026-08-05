@@ -1,51 +1,69 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface StandingsModalProps {
   leagueName: string;
   onClose: () => void;
 }
 
-const MOCK_TABLES: Record<string, Array<any>> = {
-  'PREMIER LEAGUE': [
-    { pos: 1, team: 'Arsenal', pj: 38, pg: 28, pe: 5, pp: 5, gf: 91, gc: 29, pts: 89, form: ['V', 'V', 'V'] },
-    { pos: 2, team: 'Manchester City', pj: 38, pg: 28, pe: 4, pp: 6, gf: 96, gc: 34, pts: 88, form: ['V', 'E', 'V'] },
-    { pos: 3, team: 'Liverpool', pj: 38, pg: 24, pe: 10, pp: 4, gf: 86, gc: 41, pts: 82, form: ['E', 'V', 'D'] },
-    { pos: 4, team: 'Aston Villa', pj: 38, pg: 20, pe: 8, pp: 10, gf: 76, gc: 61, pts: 68, form: ['V', 'D', 'V'] },
-    { pos: 5, team: 'Tottenham', pj: 38, pg: 20, pe: 6, pp: 12, gf: 74, gc: 61, pts: 66, form: ['D', 'V', 'V'] },
-    { pos: 6, team: 'Chelsea', pj: 38, pg: 18, pe: 9, pp: 11, gf: 77, gc: 63, pts: 63, form: ['V', 'V', 'E'] },
-    { pos: 7, team: 'Newcastle', pj: 38, pg: 18, pe: 6, pp: 14, gf: 85, gc: 62, pts: 60, form: ['E', 'D', 'V'] },
-    { pos: 18, team: 'Luton Town', pj: 38, pg: 6, pe: 8, pp: 24, gf: 52, gc: 85, pts: 26, form: ['D', 'D', 'D'] },
-    { pos: 19, team: 'Burnley', pj: 38, pg: 5, pe: 9, pp: 24, gf: 41, gc: 78, pts: 24, form: ['D', 'E', 'D'] },
-    { pos: 20, team: 'Sheffield Utd', pj: 38, pg: 3, pe: 7, pp: 28, gf: 35, gc: 104, pts: 16, form: ['D', 'D', 'D'] },
-  ],
-  LALIGA: [
-    { pos: 1, team: 'Real Madrid', pj: 38, pg: 29, pe: 8, pp: 1, gf: 87, gc: 26, pts: 95, form: ['V', 'V', 'V'] },
-    { pos: 2, team: 'FC Barcelona', pj: 38, pg: 26, pe: 7, pp: 5, gf: 79, gc: 44, pts: 85, form: ['V', 'V', 'E'] },
-    { pos: 3, team: 'Girona FC', pj: 38, pg: 25, pe: 6, pp: 7, gf: 85, gc: 46, pts: 81, form: ['V', 'D', 'V'] },
-    { pos: 4, team: 'Atlético de Madrid', pj: 38, pg: 24, pe: 4, pp: 10, gf: 70, gc: 43, pts: 76, form: ['V', 'V', 'D'] },
-    { pos: 5, team: 'Athletic Club', pj: 38, pg: 19, pe: 11, pp: 8, gf: 61, gc: 37, pts: 68, form: ['E', 'V', 'V'] },
-  ],
+// Mapeo inteligente del nombre de la liga al código oficial de la API
+const getLeagueCode = (name: string): string => {
+  const lower = name.toLowerCase();
+  
+  if (lower.includes('eredivisie')) return 'DED';
+  if (lower.includes('primeira') || lower.includes('portugal')) return 'PPL';
+  if (lower.includes('premier')) return 'PL';
+  if (lower.includes('laliga') || lower.includes('primera') || lower.includes('españa')) return 'PD';
+  if (lower.includes('bundesliga')) return 'BL1';
+  if (lower.includes('serie a') || lower.includes('italia')) return 'SA';
+  if (lower.includes('champions')) return 'CL';
+  if (lower.includes('ligue 1') || lower.includes('francia')) return 'FL1';
+  
+  return 'PL'; // Default fallback
 };
 
 export default function StandingsModal({ leagueName, onClose }: StandingsModalProps) {
-  const [activeTab, setActiveTab] = useState<string>(
-    leagueName.toUpperCase().includes('LALIGA') ? 'LALIGA' : 'PREMIER LEAGUE'
-  );
+  const [table, setTable] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const standings = MOCK_TABLES[activeTab] || MOCK_TABLES['PREMIER LEAGUE'];
+  const leagueCode = getLeagueCode(leagueName);
+
+  useEffect(() => {
+    async function fetchStandings() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/standings?league=${leagueCode}`);
+        if (!res.ok) throw new Error('Error al cargar la tabla');
+        const data = await res.json();
+        
+        if (data.standings && data.standings.length > 0) {
+          setTable(data.standings[0].table || []);
+        } else {
+          setTable([]);
+        }
+      } catch (err) {
+        console.error(err);
+        setError('No se pudo cargar la tabla de posiciones.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStandings();
+  }, [leagueCode]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl relative text-zinc-100 max-h-[90vh] flex flex-col">
-        {/* Modal Header */}
-        <div className="p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
-          <div>
-            <h3 className="text-lg font-black tracking-wider flex items-center gap-2">
-              📊 TABLA OFICIAL DE POSICIONES
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative text-zinc-100 max-h-[85vh] flex flex-col">
+        {/* Header Modal */}
+        <div className="p-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-950/50">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📊</span>
+            <h3 className="text-sm font-black tracking-widest text-emerald-400 uppercase">
+              TABLA DE POSICIONES - {leagueName}
             </h3>
-            <p className="text-xs text-zinc-400">Temporada Oficial 2025/2026</p>
           </div>
           <button
             onClick={onClose}
@@ -55,93 +73,55 @@ export default function StandingsModal({ leagueName, onClose }: StandingsModalPr
           </button>
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex gap-2 p-3 bg-zinc-950/40 border-b border-zinc-800/60">
-          {['PREMIER LEAGUE', 'LALIGA'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === tab
-                  ? 'bg-emerald-500 text-black shadow-md'
-                  : 'bg-zinc-800/50 text-zinc-400 hover:text-white'
-              }`}
-            >
-              {tab === 'PREMIER LEAGUE' ? '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League' : '🇪🇸 LaLiga'}
-            </button>
-          ))}
-        </div>
-
-        {/* Standings Table */}
+        {/* Tabla */}
         <div className="p-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-zinc-800">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="text-zinc-500 border-b border-zinc-800 uppercase font-black tracking-wider">
-                <th className="py-2.5 px-2">#</th>
-                <th className="py-2.5 px-2">Equipo</th>
-                <th className="py-2.5 px-2 text-center">PJ</th>
-                <th className="py-2.5 px-2 text-center">PG</th>
-                <th className="py-2.5 px-2 text-center">PE</th>
-                <th className="py-2.5 px-2 text-center">PP</th>
-                <th className="py-2.5 px-2 text-center">DG</th>
-                <th className="py-2.5 px-2 text-center font-bold text-emerald-400">PTS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {standings.map((row) => {
-                const isChampions = row.pos <= 4;
-                const isRelegation = row.pos >= 18;
-
-                return (
-                  <tr
-                    key={row.team}
-                    className={`hover:bg-zinc-800/40 transition-colors ${
-                      isChampions
-                        ? 'bg-emerald-500/5'
-                        : isRelegation
-                        ? 'bg-rose-500/5'
-                        : ''
-                    }`}
-                  >
-                    <td className="py-3 px-2 font-black">
-                      <span
-                        className={`w-5 h-5 rounded flex items-center justify-center text-[10px] ${
-                          isChampions
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : isRelegation
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                            : 'text-zinc-400'
-                        }`}
-                      >
-                        {row.pos}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 font-bold text-zinc-100">{row.team}</td>
-                    <td className="py-3 px-2 text-center text-zinc-400">{row.pj}</td>
-                    <td className="py-3 px-2 text-center text-zinc-400">{row.pg}</td>
-                    <td className="py-3 px-2 text-center text-zinc-400">{row.pe}</td>
-                    <td className="py-3 px-2 text-center text-zinc-400">{row.pp}</td>
-                    <td className="py-3 px-2 text-center font-semibold text-zinc-300">
-                      {row.gf - row.gc > 0 ? `+${row.gf - row.gc}` : row.gf - row.gc}
-                    </td>
-                    <td className="py-3 px-2 text-center font-black text-sm text-emerald-400">
-                      {row.pts}
-                    </td>
+          {loading ? (
+            <div className="py-12 text-center text-zinc-500 animate-pulse text-xs">
+              Cargando clasificación oficial de {leagueName}...
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-zinc-400 text-xs">{error}</div>
+          ) : table.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-400 font-extrabold uppercase text-[10px]">
+                    <th className="py-2.5 px-2">#</th>
+                    <th className="py-2.5 px-2">Equipo</th>
+                    <th className="py-2.5 px-2 text-center">PJ</th>
+                    <th className="py-2.5 px-2 text-center">G</th>
+                    <th className="py-2.5 px-2 text-center">E</th>
+                    <th className="py-2.5 px-2 text-center">P</th>
+                    <th className="py-2.5 px-2 text-center">DG</th>
+                    <th className="py-2.5 px-2 text-center font-black text-emerald-400">PTS</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Legend */}
-        <div className="p-3 bg-zinc-950/60 border-t border-zinc-800 text-[10px] text-zinc-500 flex gap-4">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded bg-emerald-500" /> Champions League
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded bg-rose-500" /> Zona de Descenso
-          </span>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50 font-medium">
+                  {table.map((row) => (
+                    <tr key={row.team?.id || row.position} className="hover:bg-zinc-800/40 transition-colors">
+                      <td className="py-2.5 px-2 font-black text-zinc-400">{row.position}</td>
+                      <td className="py-2.5 px-2 flex items-center gap-2">
+                        {row.team?.crest && (
+                          <img src={row.team.crest} alt={row.team.name} className="w-4 h-4 object-contain" />
+                        )}
+                        <span className="truncate font-bold text-zinc-200">{row.team?.shortName || row.team?.name}</span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-zinc-400">{row.playedGames}</td>
+                      <td className="py-2.5 px-2 text-center text-zinc-400">{row.won}</td>
+                      <td className="py-2.5 px-2 text-center text-zinc-400">{row.draw}</td>
+                      <td className="py-2.5 px-2 text-center text-zinc-400">{row.lost}</td>
+                      <td className="py-2.5 px-2 text-center text-zinc-400">{row.goalDifference}</td>
+                      <td className="py-2.5 px-2 text-center font-extrabold text-emerald-400">{row.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-zinc-500 text-xs">
+              No hay datos de tabla disponibles para esta competición.
+            </div>
+          )}
         </div>
       </div>
     </div>
