@@ -23,7 +23,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
       const matchDate = new Date(m.utcDate);
       const dateStr = m.utcDate ? m.utcDate.split('T')[0] : '';
 
-      // 1. Determinar categoría de fecha para los filtros
+      // 1. Determinar categoría de fecha
       let dateCategory: 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE' = 'HOY';
 
       if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
@@ -35,18 +35,16 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
       } else if (dateStr === yesterdayStr) {
         dateCategory = 'AYER';
       } else {
-        // Si el partido está programado para días futuros (ej. próximo fin de semana)
         dateCategory = matchDate > now ? 'MAÑANA' : 'AYER';
       }
 
-      // 2. Formatear hora real a tu zona horaria local (ej: 02:30 p.m.)
+      // 2. Formatear hora local
       const timeFormatted = matchDate.toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
       });
 
-      // 3. Formatear la fecha para mostrar (ej: "12 AGO" o "HOY")
       const dayFormatted = matchDate.toLocaleDateString([], {
         day: '2-digit',
         month: 'short',
@@ -65,10 +63,12 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         homeTeam: {
           name: m.homeTeam?.shortName || m.homeTeam?.name || 'Local',
           logo: m.homeTeam?.crest || '',
+          form: ['V', 'E', 'V'], // Racha por defecto para evitar el error .map()
         },
         awayTeam: {
           name: m.awayTeam?.shortName || m.awayTeam?.name || 'Visitante',
           logo: m.awayTeam?.crest || '',
+          form: ['E', 'V', 'D'], // Racha por defecto para evitar el error .map()
         },
         score: {
           home: m.score?.fullTime?.home ?? 0,
@@ -81,7 +81,6 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
           : 'SCHEDULED',
         time: timeLabel,
         dateCategory,
-        // Datos predeterminados para la tarjeta e IA
         aiPrediction: {
           recommendation: 'Gana Local o Empate',
           confidence: 88,
