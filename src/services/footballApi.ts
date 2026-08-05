@@ -23,7 +23,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
       const matchDate = new Date(m.utcDate);
       const dateStr = m.utcDate ? m.utcDate.split('T')[0] : '';
 
-      // 1. Determinar categoría de fecha
+      // Categoría de fecha
       let dateCategory: 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE' = 'HOY';
 
       if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
@@ -38,7 +38,7 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         dateCategory = matchDate > now ? 'MAÑANA' : 'AYER';
       }
 
-      // 2. Formatear hora local
+      // Formato de hora local
       const timeFormatted = matchDate.toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
@@ -63,16 +63,23 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         homeTeam: {
           name: m.homeTeam?.shortName || m.homeTeam?.name || 'Local',
           logo: m.homeTeam?.crest || '',
-          form: ['V', 'E', 'V'], // Racha por defecto para evitar el error .map()
+          form: ['V', 'E', 'V'],
         },
         awayTeam: {
           name: m.awayTeam?.shortName || m.awayTeam?.name || 'Visitante',
           logo: m.awayTeam?.crest || '',
-          form: ['E', 'V', 'D'], // Racha por defecto para evitar el error .map()
+          form: ['E', 'V', 'D'],
         },
+        // Estructura de marcador garantizada
         score: {
           home: m.score?.fullTime?.home ?? 0,
           away: m.score?.fullTime?.away ?? 0,
+        },
+        // Estructura de estadísticas garantizada para evitar errores al leer .home
+        stats: {
+          possession: { home: 50, away: 50 },
+          shotsOnTarget: { home: 4, away: 4 },
+          corners: { home: 5, away: 5 },
         },
         status: m.status === 'IN_PLAY' || m.status === 'PAUSED'
           ? 'LIVE'
