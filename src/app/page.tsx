@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOCK_MATCHES, Match } from '@/data/mockMatches';
 import MatchCard from '@/components/MatchCard';
 import MatchModal from '@/components/MatchModal';
 import StandingsModal from '@/components/StandingsModal';
+import { fetchRealMatches } from '@/services/footballApi';
 
 type FilterType = 'AYER' | 'HOY' | 'MAÑANA' | 'LIVE';
 
@@ -16,11 +17,25 @@ const LEAGUES = [
 ];
 
 export default function Home() {
+  const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedLeagueTable, setSelectedLeagueTable] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('HOY');
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      const realData = await fetchRealMatches();
+      if (realData && realData.length > 0) {
+        setMatches(realData);
+      }
+      setIsLoading(false);
+    }
+    loadData();
+  }, []);
 
   const getLeagueKey = (leagueString: string) => {
     if (leagueString.includes('PREMIER')) return 'PREMIER';
@@ -29,7 +44,7 @@ export default function Home() {
     return 'PREMIER';
   };
 
-  const filteredMatches = MOCK_MATCHES.filter((match) => {
+  const filteredMatches = matches.filter((match) => {
     const matchesDate = activeFilter === 'LIVE' ? match.status === 'LIVE' : match.dateCategory === activeFilter;
     const matchesLeague =
       selectedLeague === 'ALL' ||
@@ -93,7 +108,7 @@ export default function Home() {
           <span className="absolute inset-y-0 left-3 flex items-center text-zinc-500 text-sm">🔍</span>
           <input
             type="text"
-            placeholder="Buscar equipo (ej. Arsenal, Madrid, PSG)..."
+            placeholder="Buscar equipo o liga real..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-zinc-900/90 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
@@ -119,7 +134,11 @@ export default function Home() {
 
       {/* Feed de Partidos */}
       <section className="space-y-6">
-        {filteredMatches.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16 bg-zinc-900/30 rounded-2xl border border-white/5 animate-pulse">
+            <p className="text-emerald-400 text-sm font-semibold">📡 Conectando con la API de Fútbol Real...</p>
+          </div>
+        ) : filteredMatches.length > 0 ? (
           filteredMatches.map((match) => (
             <div key={match.id}>
               <div className="flex items-center justify-between text-xs font-bold text-zinc-400 tracking-wider uppercase border-l-2 border-emerald-500 pl-3 mb-3">
@@ -138,7 +157,7 @@ export default function Home() {
           ))
         ) : (
           <div className="text-center py-16 bg-zinc-900/30 rounded-2xl border border-white/5">
-            <p className="text-zinc-400 text-sm font-medium">No se encontraron partidos.</p>
+            <p className="text-zinc-400 text-sm font-medium">No hay partidos programados en este momento.</p>
           </div>
         )}
       </section>
