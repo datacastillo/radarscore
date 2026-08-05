@@ -5,6 +5,7 @@ import { Match } from '@/data/mockMatches';
 import MatchCard from '@/components/MatchCard';
 import MatchModal from '@/components/MatchModal';
 import StandingsModal from '@/components/StandingsModal';
+import PickOfTheDay from '@/components/PickOfTheDay';
 import { fetchRealMatches } from '@/services/footballApi';
 
 const LEAGUES_LIST = [
@@ -188,6 +189,14 @@ export default function Home() {
         {/* CONTENIDO PRINCIPAL */}
         <section className="lg:col-span-9 space-y-6">
           
+          {/* 👑 PICK DEL DÍA (Destacado VIP) */}
+          {!loading && filteredMatches.length > 0 && (
+            <PickOfTheDay
+              matches={filteredMatches}
+              onSelectMatch={(m) => setSelectedMatch(m)}
+            />
+          )}
+
           {/* Buscador */}
           <div className="relative">
             <input
