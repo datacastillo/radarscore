@@ -1,94 +1,170 @@
+export interface Team {
+  name: string;
+  logo: string;
+  form: string[];
+}
+
+export interface MatchStats {
+  xg?: number[];
+  possession?: number[] | { home: number; away: number };
+  shotsOnTarget?: number[] | { home: number; away: number };
+  corners?: number[] | { home: number; away: number };
+  fouls?: number[];
+}
+
 export interface Match {
   id: string;
   league: string;
   flag: string;
-  status: 'LIVE' | 'FINISHED' | 'SCHEDULED';
-  dateCategory: 'AYER' | 'HOY' | 'MAÑANA';
-  minute?: number;
-  time?: string;
-  homeTeam: { name: string; icon: string; form: string[] };
-  awayTeam: { name: string; icon: string; form: string[] };
-  homeScore?: number;
-  awayScore?: number;
-  stadium: string;
-  aiConfidence: number;
-  aiPrediction: string;
-  probs: { home: number; draw: number; away: number };
-  aiInsight: string;
-  stats?: {
-    xg: [number, number];
-    possession: [number, number];
-    shotsOnTarget: [number, number];
-    fouls: [number, number];
+  homeTeam: Team;
+  awayTeam: Team;
+  score?: {
+    home: number;
+    away: number;
+  };
+  probs?: {
+    home: number;
+    draw: number;
+    away: number;
+  };
+  probabilities?: {
+    home: number;
+    draw: number;
+    away: number;
+  };
+  stats?: MatchStats;
+  status: 'LIVE' | 'FT' | 'SCHEDULED';
+  time: string;
+  dateCategory: 'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA' | 'PROXIMOS' | 'LIVE';
+  aiPrediction?: {
+    recommendation: string;
+    confidence: number;
+    homeWin: number;
+    draw: number;
+    awayWin: number;
+    reasoning: string;
   };
 }
 
 export const MOCK_MATCHES: Match[] = [
   {
-    id: '1',
-    league: 'PREMIER LEAGUE · JORNADA 26',
+    id: 'mock-1',
+    league: 'PREMIER LEAGUE',
     flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-    status: 'LIVE',
-    dateCategory: 'HOY',
-    minute: 68,
-    homeTeam: { name: 'Arsenal', icon: '🔴', form: ['V', 'V', 'E'] },
-    awayTeam: { name: 'Chelsea', icon: '🔵', form: ['D', 'V', 'E'] },
-    homeScore: 2,
-    awayScore: 1,
-    stadium: 'Emirates Stadium',
-    aiConfidence: 78,
-    aiPrediction: 'Gana Local (58%)',
+    homeTeam: {
+      name: 'Arsenal',
+      logo: 'https://crests.football-data.org/57.png',
+      form: ['V', 'V', 'E'],
+    },
+    awayTeam: {
+      name: 'Chelsea',
+      logo: 'https://crests.football-data.org/61.png',
+      form: ['D', 'V', 'E'],
+    },
+    score: { home: 2, away: 1 },
     probs: { home: 58, draw: 24, away: 18 },
-    aiInsight: 'Arsenal invicto en casa (8/8). Chelsea concede un promedio de 1.8 goles jugando fuera.',
-    stats: { xg: [2.1, 0.9], possession: [62, 38], shotsOnTarget: [7, 3], fouls: [9, 14] }
+    probabilities: { home: 58, draw: 24, away: 18 },
+    stats: { xg: [1.8, 0.9], possession: [58, 42], shotsOnTarget: [6, 3], corners: [7, 4] },
+    status: 'LIVE',
+    time: 'EN VIVO - 68\'',
+    dateCategory: 'PROXIMOS',
+    aiPrediction: {
+      recommendation: 'Gana Local o Empate',
+      confidence: 88,
+      homeWin: 58,
+      draw: 24,
+      awayWin: 18,
+      reasoning: 'Racha local implacable y dominio de posesión en zona ofensiva.',
+    },
   },
   {
-    id: '2',
-    league: 'LALIGA EA SPORTS · JORNADA 24',
+    id: 'mock-2',
+    league: 'LALIGA',
     flag: '🇪🇸',
+    homeTeam: {
+      name: 'Real Madrid',
+      logo: 'https://crests.football-data.org/86.png',
+      form: ['V', 'V', 'V'],
+    },
+    awayTeam: {
+      name: 'FC Barcelona',
+      logo: 'https://crests.football-data.org/81.png',
+      form: ['V', 'E', 'V'],
+    },
+    score: { home: 0, away: 0 },
+    probs: { home: 50, draw: 28, away: 22 },
+    probabilities: { home: 50, draw: 28, away: 22 },
+    stats: { xg: [2.1, 1.4], possession: [52, 48], shotsOnTarget: [8, 5], corners: [6, 5] },
     status: 'SCHEDULED',
-    dateCategory: 'HOY',
     time: '21:00',
-    homeTeam: { name: 'Real Madrid', icon: '⚪', form: ['V', 'V', 'V'] },
-    awayTeam: { name: 'Barcelona', icon: '🔵🔴', form: ['V', 'E', 'V'] },
-    stadium: 'Santiago Bernabéu',
-    aiConfidence: 85,
-    aiPrediction: 'Empate o Visitante (62%)',
-    probs: { home: 38, draw: 30, away: 32 },
-    aiInsight: 'Clásico de alta intensidad. Ambos equipos anotan en el 90% de sus últimos 10 enfrentamientos.',
-    stats: { xg: [1.8, 1.7], possession: [50, 50], shotsOnTarget: [5, 6], fouls: [11, 10] }
+    dateCategory: 'PROXIMOS',
+    aiPrediction: {
+      recommendation: 'Ambos Anotan / Gana Local',
+      confidence: 85,
+      homeWin: 50,
+      draw: 28,
+      awayWin: 22,
+      reasoning: 'Elevado rendimiento en remates a puerta de ambos ataques en clásicos.',
+    },
   },
   {
-    id: '3',
-    league: 'UEFA CHAMPIONS LEAGUE · OCTAVOS',
+    id: 'mock-3',
+    league: 'CHAMPIONS LEAGUE',
     flag: '🇪🇺',
-    status: 'FINISHED',
-    dateCategory: 'AYER',
-    homeTeam: { name: 'Bayern Munich', icon: '🔴', form: ['V', 'D', 'V'] },
-    awayTeam: { name: 'PSG', icon: '🔵', form: ['V', 'V', 'E'] },
-    homeScore: 3,
-    awayScore: 1,
-    stadium: 'Allianz Arena',
-    aiConfidence: 91,
-    aiPrediction: 'Gana Local (Acertado)',
-    probs: { home: 65, draw: 20, away: 15 },
-    aiInsight: 'Predicción acertada. Dominio absoluto del Bayern en tiros a puerta durante el primer tiempo.',
-    stats: { xg: [3.4, 1.1], possession: [58, 42], shotsOnTarget: [10, 4], fouls: [8, 12] }
+    homeTeam: {
+      name: 'Bayern München',
+      logo: 'https://crests.football-data.org/5.png',
+      form: ['V', 'V', 'D'],
+    },
+    awayTeam: {
+      name: 'Paris Saint-Germain',
+      logo: 'https://crests.football-data.org/524.png',
+      form: ['V', 'V', 'V'],
+    },
+    score: { home: 0, away: 0 },
+    probs: { home: 45, draw: 30, away: 25 },
+    probabilities: { home: 45, draw: 30, away: 25 },
+    stats: { xg: [1.6, 1.2], possession: [50, 50], shotsOnTarget: [5, 4], corners: [5, 4] },
+    status: 'SCHEDULED',
+    time: 'PRÓXIMO MARTES - 20:00',
+    dateCategory: 'PROXIMOS',
+    aiPrediction: {
+      recommendation: 'Over 2.5 Goles',
+      confidence: 82,
+      homeWin: 45,
+      draw: 30,
+      awayWin: 25,
+      reasoning: 'Enfrentamiento directo de alto ritmo con promedio superior a 3 goles por juego.',
+    },
   },
   {
-    id: '4',
-    league: 'PREMIER LEAGUE · JORNADA 27',
-    flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    id: 'mock-4',
+    league: 'SERIE A',
+    flag: '🇮🇹',
+    homeTeam: {
+      name: 'Inter Milan',
+      logo: 'https://crests.football-data.org/108.png',
+      form: ['V', 'V', 'E'],
+    },
+    awayTeam: {
+      name: 'AC Milan',
+      logo: 'https://crests.football-data.org/98.png',
+      form: ['E', 'V', 'V'],
+    },
+    score: { home: 0, away: 0 },
+    probs: { home: 48, draw: 30, away: 22 },
+    probabilities: { home: 48, draw: 30, away: 22 },
+    stats: { xg: [1.5, 1.1], possession: [53, 47], shotsOnTarget: [5, 3], corners: [6, 4] },
     status: 'SCHEDULED',
-    dateCategory: 'MAÑANA',
-    time: '17:30',
-    homeTeam: { name: 'Manchester City', icon: '🩵', form: ['V', 'V', 'V'] },
-    awayTeam: { name: 'Liverpool', icon: '🔴', form: ['V', 'E', 'V'] },
-    stadium: 'Etihad Stadium',
-    aiConfidence: 82,
-    aiPrediction: 'Gana Local o Empate (75%)',
-    probs: { home: 52, draw: 28, away: 20 },
-    aiInsight: 'Duelo por el liderato. City promedia 2.8 goles como local esta temporada.',
-    stats: { xg: [2.0, 1.5], possession: [55, 45], shotsOnTarget: [6, 5], fouls: [7, 9] }
-  }
+    time: 'DOMINGO - 18:00',
+    dateCategory: 'PROXIMOS',
+    aiPrediction: {
+      recommendation: 'Gana Inter o Empate',
+      confidence: 86,
+      homeWin: 48,
+      draw: 30,
+      awayWin: 22,
+      reasoning: 'Solidez defensiva local como factor determinante en partidos de alta presión.',
+    },
+  },
 ];

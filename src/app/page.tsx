@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MOCK_MATCHES, Match } from '@/data/mockMatches';
+import { Match } from '@/data/mockMatches';
 import MatchCard from '@/components/MatchCard';
 import MatchModal from '@/components/MatchModal';
 import StandingsModal from '@/components/StandingsModal';
 import { fetchRealMatches } from '@/services/footballApi';
 
 export default function Home() {
-  const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
+  const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedLeagueForTable, setSelectedLeagueForTable] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA' | 'PRÓXIMOS'>('PRÓXIMOS');
@@ -20,7 +20,7 @@ export default function Home() {
     async function loadMatches() {
       setLoading(true);
       const realData = await fetchRealMatches();
-      if (realData && realData.length > 0) {
+      if (realData) {
         setMatches(realData);
       }
       setLoading(false);
@@ -28,7 +28,6 @@ export default function Home() {
     loadMatches();
   }, []);
 
-  // Mapeo de categoría a la propiedad dateCategory
   const categoryMap: Record<string, string> = {
     'EN VIVO': 'LIVE',
     'AYER': 'AYER',
@@ -39,19 +38,30 @@ export default function Home() {
 
   const currentCategoryValue = categoryMap[selectedCategory];
 
-  // Filtrado de partidos según la categoría seleccionada
+  // Filtrar estrictamente por fecha
   const matchesByDate = matches.filter((m) => {
     if (selectedCategory === 'PRÓXIMOS') {
-      return (m.dateCategory as string) === 'PROXIMOS' || m.dateCategory === 'MAÑANA';
+      return (m.dateCategory as string) === 'PROXIMOS' || m.dateCategory === 'MAÑANA' || m.dateCategory === 'HOY';
     }
     return m.dateCategory === currentCategoryValue;
   });
 
-  // Filtrar por Liga y Búsqueda por texto
+  // Filtrar por Liga elegida y Buscador
   const filteredMatches = matchesByDate.filter((m) => {
-    const matchesLeague =
-      selectedLeague === 'TODAS' ||
-      m.league.toLowerCase().includes(selectedLeague.toLowerCase());
+    const matchLeagueName = m.league.toLowerCase();
+    const filterLeague = selectedLeague.toLowerCase();
+
+    let matchesLeague = false;
+
+    if (selectedLeague === 'TODAS') {
+      matchesLeague = true;
+    } else if (filterLeague === 'laliga') {
+      matchesLeague = matchLeagueName.includes('laliga') || matchLeagueName.includes('primera');
+    } else if (filterLeague === 'champions league') {
+      matchesLeague = matchLeagueName.includes('champions');
+    } else {
+      matchesLeague = matchLeagueName.includes(filterLeague);
+    }
 
     const matchesSearch =
       searchQuery === '' ||
@@ -73,7 +83,7 @@ export default function Home() {
           </h1>
         </div>
 
-        {/* Filtros de Fecha con la opción PRÓXIMOS incorporada */}
+        {/* Filtros de Fecha */}
         <div className="flex bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs font-bold overflow-x-auto max-w-full scrollbar-none">
           {(['EN VIVO', 'AYER', 'HOY', 'MAÑANA', 'PRÓXIMOS'] as const).map((cat) => (
             <button
@@ -109,7 +119,9 @@ export default function Home() {
           { id: 'TODAS', label: '🌐 Todas las Ligas' },
           { id: 'Premier League', label: '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League' },
           { id: 'LaLiga', label: '🇪🇸 LaLiga' },
-          { id: 'Champions League', label: '🇪🇺 Champions League' },
+          { id: 'Champions League', label: '🇪🇺 Champions' },
+          { id: 'Bundesliga', label: '🇩🇪 Bundesliga' },
+          { id: 'Serie A', label: '🇮🇹 Serie A' },
         ].map((league) => (
           <button
             key={league.id}
@@ -128,7 +140,7 @@ export default function Home() {
       {/* Lista de Partidos */}
       {loading ? (
         <div className="py-20 text-center text-zinc-500 animate-pulse text-sm">
-          Cargando partidos en tiempo real...
+          Cargando partidos reales en tiempo real...
         </div>
       ) : filteredMatches.length > 0 ? (
         <div className="space-y-4">
@@ -153,11 +165,14 @@ export default function Home() {
       ) : (
         <div className="py-16 text-center bg-zinc-900/30 rounded-2xl border border-zinc-800/50 p-6">
           <p className="text-zinc-300 font-semibold text-sm">
-            No hay partidos programados para {selectedCategory.toLowerCase()}.
+            No hay partidos programados para esta fecha/liga en la API oficial.
           </p>
-          <p className="text-zinc-500 text-xs mt-2">
-            Haz clic en la pestaña <button onClick={() => setSelectedCategory('PRÓXIMOS')} className="text-emerald-400 font-bold underline">PRÓXIMOS</button> para consultar el calendario oficial.
-          </p>
+          <button
+            onClick={() => { setSelectedLeague('TODAS'); setSelectedCategory('PRÓXIMOS'); }}
+            className="mt-3 text-xs text-emerald-400 font-bold underline"
+          >
+            Ver todos los próximos partidos reales
+          </button>
         </div>
       )}
 
