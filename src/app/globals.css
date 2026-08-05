@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #09090b;
+    color: #f4f4f5;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Efecto de resplandor para la Inteligencia Artificial */
+.ai-glow {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+}
