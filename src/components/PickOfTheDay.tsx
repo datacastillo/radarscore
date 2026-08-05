@@ -22,10 +22,11 @@ const LIGA_PRIORITY: Record<string, number> = {
 export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayProps) {
   if (!matches || matches.length === 0) return null;
 
-  // 1. Filtrar partidos no finalizados preferentemente
-  const pendingMatches = matches.filter(
-    (m) => m.status !== 'FT' && m.status !== 'POSTPONED' && m.status !== 'CANCELLED'
-  );
+  // 1. Filtrar partidos no finalizados (casting seguro a string para TypeScript)
+  const pendingMatches = matches.filter((m) => {
+    const status = (m.status as string) || '';
+    return status !== 'FT' && status !== 'FINISHED' && status !== 'POSTPONED' && status !== 'CANCELLED';
+  });
 
   const pool = pendingMatches.length > 0 ? pendingMatches : matches;
 
@@ -73,7 +74,7 @@ export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayPro
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-950/40 via-zinc-900 to-emerald-950/40 border border-amber-500/40 p-5 shadow-2xl mb-6 group hover:border-amber-500/70 transition-all duration-300">
-      {/* Luces de Neón de Fondo (Glow Effect) */}
+      {/* Luces de Neón de Fondo */}
       <div className="absolute -top-20 -left-20 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/20 transition-all" />
       <div className="absolute -bottom-20 -right-20 w-44 h-44 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/20 transition-all" />
 
