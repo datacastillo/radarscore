@@ -20,7 +20,7 @@ import {
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
 export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
@@ -66,12 +66,12 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           password,
         });
         if (error) throw error;
-        onSuccess();
+        if (onSuccess) onSuccess();
         onClose();
       } else {
         // Validación de contraseñas
         if (password !== confirmPassword) {
-          throw new Error('Las contraseñas no coinciden. Verífilas e intenta de nuevo.');
+          throw new Error('Las contraseñas no coinciden. Verifícalas e intenta de nuevo.');
         }
 
         if (password.length < 6) {
@@ -104,7 +104,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
             `¡Cuenta registrada! Hemos enviado un correo de verificación a ${email}. Por favor revisa tu bandeja de entrada o SPAM y haz clic en el enlace para activar tu cuenta.`
           );
         } else {
-          onSuccess();
+          if (onSuccess) onSuccess();
           onClose();
         }
       }
@@ -139,7 +139,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
             resetForm();
             onClose();
           }}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 hover:bg-gray-800 p-2 rounded-full"
+          className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 hover:bg-gray-800 p-2 rounded-full cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -167,7 +167,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               setIsLogin(true);
               resetForm();
             }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
               isLogin
                 ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
                 : 'text-gray-400 hover:text-white'
@@ -181,7 +181,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               setIsLogin(false);
               resetForm();
             }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
               !isLogin
                 ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
                 : 'text-gray-400 hover:text-white'
@@ -203,7 +203,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 setIsLogin(true);
                 setSuccessMsg(null);
               }}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl transition text-xs mt-2 shadow-lg shadow-emerald-500/20"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl transition text-xs mt-2 shadow-lg shadow-emerald-500/20 cursor-pointer"
             >
               Ir a Iniciar Sesión
             </button>
@@ -269,7 +269,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -293,7 +293,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition cursor-pointer"
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -305,7 +305,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 active:scale-95 mt-2"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 active:scale-95 mt-2 cursor-pointer"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -329,7 +329,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                     setIsLogin(!isLogin);
                     resetForm();
                   }}
-                  className="ml-1 text-emerald-400 font-bold hover:underline"
+                  className="ml-1 text-emerald-400 font-bold hover:underline cursor-pointer"
                 >
                   {isLogin ? 'Regístrate' : 'Inicia Sesión'}
                 </button>
