@@ -18,7 +18,9 @@ import {
   UserPlus,
   UserCheck,
   Users,
-  Loader2
+  Loader2,
+  Edit3,
+  X
 } from 'lucide-react';
 
 interface Profile {
@@ -50,7 +52,7 @@ interface Ticket {
 export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const usernameParam = params.username as string;
+  const usernameParam = params?.username as string;
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -64,6 +66,13 @@ export default function PublicProfilePage() {
   const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Estados de Edición de Perfil
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     if (usernameParam) {
@@ -84,7 +93,7 @@ export default function PublicProfilePage() {
         .from('profiles')
         .select('*')
         .eq('username', usernameParam)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profileData) {
         setProfile(null);
@@ -93,6 +102,9 @@ export default function PublicProfilePage() {
       }
 
       setProfile(profileData);
+      setEditFullName(profileData.full_name || '');
+      setEditBio(profileData.bio || '');
+      setEditAvatarUrl(profileData.avatar_url || '');
 
       // 3. Contar Seguidores y Siguiendo
       const { count: fCount } = await supabase
@@ -116,7 +128,7 @@ export default function PublicProfilePage() {
           .select('id')
           .eq('follower_id', sessionUser.id)
           .eq('following_id', profileData.id)
-          .single();
+          .maybeSingle();
 
         setIsFollowing(!!isFol);
       }
@@ -175,12 +187,38 @@ export default function PublicProfilePage() {
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !currentUser) return;
+
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editFullName,
+          bio: editBio,
+          avatar_url: editAvatarUrl,
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, full_name: editFullName, bio: editBio, avatar_url: editAvatarUrl } : null);
+      setIsEditOpen(false);
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar el perfil');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B0E14] text-white flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-gray-400">Cargando perfil de @{usernameParam}...</p>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Cargando perfil de @{usernameParam}...</p>
         </div>
       </div>
     );
@@ -189,7 +227,7 @@ export default function PublicProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-[#0B0E14] text-white flex items-center justify-center p-4">
-        <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-8 max-w-md text-center space-y-4">
+        <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-8 max-w-md text-center space-y-4 shadow-2xl">
           <h2 className="text-xl font-black text-white">Usuario no encontrado</h2>
           <p className="text-xs text-gray-400">
             El tipster <span className="text-emerald-400 font-bold">@{usernameParam}</span> no existe o cambió de nombre de usuario.
@@ -225,7 +263,7 @@ export default function PublicProfilePage() {
         {/* Botón Volver */}
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition bg-[#141A23] border border-gray-800/80 px-3.5 py-2 rounded-xl"
+          className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition bg-[#141A23] border border-gray-800/80 px-3.5 py-2 rounded-xl cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Volver
         </button>
@@ -255,12 +293,12 @@ export default function PublicProfilePage() {
                   <p className="text-xs font-semibold text-emerald-400 mt-0.5">@{profile.username}</p>
                 </div>
 
-                {/* Botón de Acción: Seguir / Siguiendo */}
-                {!isOwnProfile && (
+                {/* Botón de Acción: Seguir / Siguiendo o Editar Perfil */}
+                {!isOwnProfile ? (
                   <button
                     onClick={handleFollowToggle}
                     disabled={followLoading}
-                    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition shadow-lg ${
+                    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition shadow-lg cursor-pointer ${
                       isFollowing
                         ? 'bg-gray-800 hover:bg-rose-500/20 hover:text-rose-400 border border-gray-700 text-gray-200'
                         : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
@@ -277,6 +315,13 @@ export default function PublicProfilePage() {
                         <UserPlus className="w-4 h-4" /> Seguir Tipster
                       </>
                     )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsEditOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                  >
+                    <Edit3 className="w-4 h-4" /> Editar Perfil
                   </button>
                 )}
               </div>
@@ -349,7 +394,7 @@ export default function PublicProfilePage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveTab('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   activeTab === 'all'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -359,7 +404,7 @@ export default function PublicProfilePage() {
               </button>
               <button
                 onClick={() => setActiveTab('wins')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   activeTab === 'wins'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -369,7 +414,7 @@ export default function PublicProfilePage() {
               </button>
               <button
                 onClick={() => setActiveTab('losses')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   activeTab === 'losses'
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -449,6 +494,66 @@ export default function PublicProfilePage() {
 
       </div>
 
+      {/* Modal Editar Perfil */}
+      {isEditOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-[#141A23] border border-gray-800 rounded-3xl max-w-md w-full p-6 space-y-4 relative shadow-2xl">
+            <button
+              onClick={() => setIsEditOpen(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 p-2 rounded-full cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <h3 className="text-xl font-black text-white">Editar Perfil</h3>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="block text-gray-300 font-bold">Nombre Completo</label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-gray-300 font-bold">URL de Avatar (Foto)</label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={editAvatarUrl}
+                  onChange={(e) => setEditAvatarUrl(e.target.value)}
+                  className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-gray-300 font-bold">Biografía</label>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  placeholder="Cuéntanos sobre tu estrategia de apuestas..."
+                  rows={3}
+                  className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar Cambios'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Autenticación */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
