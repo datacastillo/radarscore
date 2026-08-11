@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
 import { 
@@ -68,9 +69,11 @@ interface CommentItem {
 }
 
 export default function ComunidadPage() {
+  const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [topTipsters, setTopTipsters] = useState<TopTipster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'verified'>('all');
   const [currentUser, setCurrentUser] = useState<any>(null);
   
@@ -104,19 +107,38 @@ export default function ComunidadPage() {
   const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
-    checkUser();
-    fetchTickets();
-    fetchTopTipsters();
-    fetchTodayMatches();
+    checkUserAndInit();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setCurrentUser(session?.user ?? null);
+      if (!session) {
+        router.replace('/?openAuth=true');
+      } else {
+        setCurrentUser(session.user);
+      }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
+
+  const checkUserAndInit = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // GUARDIÁN: Si no hay sesión, expulsa al usuario a la Landing Page
+    if (!session) {
+      router.replace('/?openAuth=true');
+      return;
+    }
+
+    setCurrentUser(session.user);
+    setIsAuthChecking(false);
+
+    // Cargar datos de la app solo para usuarios autenticados
+    fetchTickets();
+    fetchTopTipsters();
+    fetchTodayMatches();
+  };
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -386,6 +408,16 @@ export default function ComunidadPage() {
     return true;
   });
 
+  // Pantalla de carga bloqueante durante la comprobación de sesión
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#0B0E14] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Verificando Credenciales...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white">
       {/* Layout Principal */}
@@ -407,7 +439,7 @@ export default function ComunidadPage() {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setActiveFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeFilter === 'all'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -417,7 +449,7 @@ export default function ComunidadPage() {
               </button>
               <button
                 onClick={() => setActiveFilter('pending')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeFilter === 'pending'
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -427,7 +459,7 @@ export default function ComunidadPage() {
               </button>
               <button
                 onClick={() => setActiveFilter('verified')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeFilter === 'verified'
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                     : 'text-gray-400 hover:text-white'
@@ -558,7 +590,7 @@ export default function ComunidadPage() {
                       {/* Botón Reacción Fuego */}
                       <button
                         onClick={() => handleReaction(ticket.id)}
-                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition ${
+                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition cursor-pointer ${
                           ticket.user_reacted
                             ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
                             : 'bg-[#0B0E14] text-gray-400 border-gray-800 hover:text-white'
@@ -571,7 +603,7 @@ export default function ComunidadPage() {
                       {/* Botón Desplegar Comentarios */}
                       <button
                         onClick={() => toggleComments(ticket.id)}
-                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition ${
+                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition cursor-pointer ${
                           expandedTicketId === ticket.id
                             ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                             : 'bg-[#0B0E14] text-gray-400 border-gray-800 hover:text-white'
@@ -585,7 +617,7 @@ export default function ComunidadPage() {
                     {/* Botón Copiar Apuesta */}
                     <button
                       onClick={() => handleCopy(ticket)}
-                      className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl transition"
+                      className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl transition cursor-pointer"
                     >
                       {copiedId === ticket.id ? (
                         <>
@@ -653,7 +685,7 @@ export default function ComunidadPage() {
                         <button
                           onClick={() => handleAddComment(ticket.id)}
                           disabled={!currentUser || postingComment || !newCommentInput.trim()}
-                          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black p-2.5 rounded-xl transition flex items-center justify-center"
+                          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black p-2.5 rounded-xl transition flex items-center justify-center cursor-pointer"
                         >
                           {postingComment ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -722,7 +754,7 @@ export default function ComunidadPage() {
           <div className="bg-[#141A23] border border-gray-800 rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 p-2 rounded-full"
+              className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 p-2 rounded-full cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -833,7 +865,7 @@ export default function ComunidadPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publicar Apuesta'}
               </button>
