@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -8,17 +8,22 @@ import AuthModal from '@/components/AuthModal';
 import { 
   Flame, 
   MessageSquare, 
-  Copy, 
-  CheckCircle2, 
   ShieldCheck, 
-  Sparkles, 
-  Award,
   Send,
   Loader2,
   X,
   Check,
-  TrendingUp,
-  PlusCircle
+  Zap,
+  Search,
+  Rocket,
+  Snowflake,
+  Camera,
+  Upload,
+  Maximize2,
+  ImageIcon,
+  Smile,
+  Sparkles,
+  Share2
 } from 'lucide-react';
 
 interface Ticket {
@@ -31,10 +36,15 @@ interface Ticket {
   stake: number;
   potential_payout?: number;
   comment?: string;
-  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost';
+  image_url?: string;
+  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost' | 'VOID';
   created_at: string;
   reactions_count?: number;
+  rockets_count?: number;
+  fades_count?: number;
   user_reacted?: boolean;
+  user_rocket?: boolean;
+  user_fade?: boolean;
   comments_count?: number;
   profiles?: {
     username: string;
@@ -42,17 +52,8 @@ interface Ticket {
     avatar_url: string;
     is_verified: boolean;
     yield_rate: number;
+    win_rate?: number;
   };
-}
-
-interface TopTipster {
-  id: string;
-  username: string;
-  full_name: string;
-  avatar_url: string;
-  yield_rate: number;
-  total_picks: number;
-  win_rate: number;
 }
 
 interface CommentItem {
@@ -70,36 +71,21 @@ interface CommentItem {
 
 export default function ComunidadPage() {
   const router = useRouter();
+  
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [topTipsters, setTopTipsters] = useState<TopTipster[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'verified'>('all');
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
-  // Modal de Login/Registro
+
+  const [activeTab, setActiveTab] = useState<'all' | 'trending' | 'live' | 'verified'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Estado Modal Crear Ticket
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Campos Nuevo Ticket
-  const [matchTitle, setMatchTitle] = useState('');
-  const [league, setLeague] = useState('Liga MX 🇲🇽');
-  const [selection, setPrediction] = useState('');
-  const [odds, setOdds] = useState('');
-  const [stake, setStake] = useState('100');
-  const [commentText, setCommentText] = useState('');
-
-  // Sugerencias de partidos
-  const [matches, setMatches] = useState<any[]>([]);
-  const [showMatchSuggestions, setShowMatchSuggestions] = useState(false);
-
-  // Copiado estado
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // COMENTARIOS ESTADOS
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
   const [ticketComments, setTicketComments] = useState<Record<string, CommentItem[]>>({});
   const [loadingComments, setLoadingComments] = useState<string | null>(null);
@@ -125,7 +111,6 @@ export default function ComunidadPage() {
   const checkUserAndInit = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // GUARDIÁN: Si no hay sesión, expulsa al usuario a la Landing Page
     if (!session) {
       router.replace('/?openAuth=true');
       return;
@@ -133,44 +118,7 @@ export default function ComunidadPage() {
 
     setCurrentUser(session.user);
     setIsAuthChecking(false);
-
-    // Cargar datos de la app solo para usuarios autenticados
     fetchTickets();
-    fetchTopTipsters();
-    fetchTodayMatches();
-  };
-
-  const checkUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setCurrentUser(session?.user ?? null);
-  };
-
-  const fetchTodayMatches = async () => {
-    try {
-      const res = await fetch('/api/matches');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setMatches(data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchTopTipsters = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url, yield_rate, total_picks, win_rate')
-        .order('yield_rate', { ascending: false })
-        .limit(5);
-
-      if (!error && data) {
-        setTopTipsters(data);
-      }
-    } catch (err) {
-      console.error('Error al cargar top tipsters:', err);
-    }
   };
 
   const fetchTickets = async () => {
@@ -188,23 +136,32 @@ export default function ComunidadPage() {
             full_name,
             avatar_url,
             is_verified,
-            yield_rate
+            yield_rate,
+            win_rate
           ),
-          reactions ( user_id ),
+          reactions ( user_id, type ),
           comments ( id )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const formattedTickets = (data || []).map((t: any) => ({
-        ...t,
-        reactions_count: t.reactions ? t.reactions.length : 0,
-        user_reacted: userId 
-          ? t.reactions?.some((r: any) => r.user_id === userId) 
-          : false,
-        comments_count: t.comments ? t.comments.length : 0,
-      }));
+      const formattedTickets = (data || []).map((t: any) => {
+        const fireReactions = t.reactions?.filter((r: any) => r.type === 'FIRE' || !r.type) || [];
+        const rocketReactions = t.reactions?.filter((r: any) => r.type === 'ROCKET') || [];
+        const fadeReactions = t.reactions?.filter((r: any) => r.type === 'FADE') || [];
+
+        return {
+          ...t,
+          reactions_count: fireReactions.length,
+          rockets_count: rocketReactions.length,
+          fades_count: fadeReactions.length,
+          user_reacted: userId ? fireReactions.some((r: any) => r.user_id === userId) : false,
+          user_rocket: userId ? rocketReactions.some((r: any) => r.user_id === userId) : false,
+          user_fade: userId ? fadeReactions.some((r: any) => r.user_id === userId) : false,
+          comments_count: t.comments ? t.comments.length : 0,
+        };
+      });
 
       setTickets(formattedTickets);
     } catch (err: any) {
@@ -214,7 +171,6 @@ export default function ComunidadPage() {
     }
   };
 
-  // Cargar comentarios
   const toggleComments = async (ticketId: string) => {
     if (expandedTicketId === ticketId) {
       setExpandedTicketId(null);
@@ -253,10 +209,8 @@ export default function ComunidadPage() {
     }
   };
 
-  // Agregar comentario
   const handleAddComment = async (ticketId: string) => {
     if (!newCommentInput.trim()) return;
-
     if (!currentUser) {
       setIsAuthModalOpen(true);
       return;
@@ -307,583 +261,747 @@ export default function ComunidadPage() {
     }
   };
 
-  // Reacción Fuego
-  const handleReaction = async (ticketId: string) => {
+  const handleReaction = async (ticketId: string, reactionType: 'FIRE' | 'ROCKET' | 'FADE') => {
     if (!currentUser) {
       setIsAuthModalOpen(true);
       return;
     }
 
-    const ticketIndex = tickets.findIndex(t => t.id === ticketId);
-    if (ticketIndex === -1) return;
+    const index = tickets.findIndex(t => t.id === ticketId);
+    if (index === -1) return;
 
-    const currentTicket = tickets[ticketIndex];
-    const isReacted = currentTicket.user_reacted;
+    const ticket = tickets[index];
+
+    const currentActiveReaction: 'FIRE' | 'ROCKET' | 'FADE' | null = 
+      ticket.user_reacted ? 'FIRE' :
+      ticket.user_rocket ? 'ROCKET' :
+      ticket.user_fade ? 'FADE' : null;
+
+    const isClickingSame = currentActiveReaction === reactionType;
 
     setTickets(prev => {
       const copy = [...prev];
-      copy[ticketIndex] = {
-        ...currentTicket,
-        user_reacted: !isReacted,
-        reactions_count: isReacted
-          ? (currentTicket.reactions_count || 1) - 1
-          : (currentTicket.reactions_count || 0) + 1,
-      };
+      const updatedTicket = { ...ticket };
+
+      if (currentActiveReaction === 'FIRE') {
+        updatedTicket.user_reacted = false;
+        updatedTicket.reactions_count = Math.max(0, (updatedTicket.reactions_count || 1) - 1);
+      } else if (currentActiveReaction === 'ROCKET') {
+        updatedTicket.user_rocket = false;
+        updatedTicket.rockets_count = Math.max(0, (updatedTicket.rockets_count || 1) - 1);
+      } else if (currentActiveReaction === 'FADE') {
+        updatedTicket.user_fade = false;
+        updatedTicket.fades_count = Math.max(0, (updatedTicket.fades_count || 1) - 1);
+      }
+
+      if (!isClickingSame) {
+        if (reactionType === 'FIRE') {
+          updatedTicket.user_reacted = true;
+          updatedTicket.reactions_count = (updatedTicket.reactions_count || 0) + 1;
+        } else if (reactionType === 'ROCKET') {
+          updatedTicket.user_rocket = true;
+          updatedTicket.rockets_count = (updatedTicket.rockets_count || 0) + 1;
+        } else if (reactionType === 'FADE') {
+          updatedTicket.user_fade = true;
+          updatedTicket.fades_count = (updatedTicket.fades_count || 0) + 1;
+        }
+      }
+
+      copy[index] = updatedTicket;
       return copy;
     });
 
     try {
-      if (isReacted) {
+      if (currentActiveReaction) {
         await supabase
           .from('reactions')
           .delete()
           .eq('ticket_id', ticketId)
           .eq('user_id', currentUser.id);
-      } else {
+      }
+
+      if (!isClickingSame) {
         await supabase
           .from('reactions')
-          .insert([{ ticket_id: ticketId, user_id: currentUser.id, type: 'FIRE' }]);
+          .insert([
+            {
+              ticket_id: ticketId,
+              user_id: currentUser.id,
+              type: reactionType
+            }
+          ]);
       }
     } catch (err) {
-      console.error('Error actualizando reacción:', err);
-      fetchTickets();
-    }
-  };
-
-  // Crear Ticket
-  const handleCreateTicket = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser) {
-      setIsAuthModalOpen(true);
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const oddsNum = parseFloat(odds);
-      const stakeNum = parseFloat(stake);
-
-      const { error } = await supabase.from('tickets').insert([
-        {
-          user_id: currentUser.id,
-          match_title: matchTitle,
-          league,
-          selection,
-          odds: oddsNum,
-          stake: stakeNum,
-          potential_payout: oddsNum * stakeNum,
-          comment: commentText || null,
-          status: 'PENDING',
-        },
-      ]);
-
-      if (error) throw error;
-
-      setIsModalOpen(false);
-      setMatchTitle('');
-      setPrediction('');
-      setOdds('');
-      setCommentText('');
-      fetchTickets();
-      fetchTopTipsters();
-    } catch (err: any) {
-      alert(err.message || 'Error al crear el ticket');
-    } finally {
-      setSubmitting(false);
+      console.error('Error al actualizar reacción:', err);
     }
   };
 
   const handleCopy = (ticket: Ticket) => {
-    const text = `🔥 ¡Apuesta recomendada por @${ticket.profiles?.username || 'RadarScore'}!\n\n⚽ ${ticket.match_title} (${ticket.league})\n🎯 Selección: ${ticket.selection}\n📈 Cuota: @${ticket.odds}\n\nSigue más pronósticos en RadarScore.app`;
+    const text = `🎯 ¡Ticket Real de @${ticket.profiles?.username || 'user'}!\n\n💬 ${ticket.comment || ticket.match_title}\n\n👉 Míralo en RadarScore.app`;
     navigator.clipboard.writeText(text);
     setCopiedId(ticket.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setTimeout(() => setCopiedId(null), 2500);
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const statusUpper = ticket.status?.toUpperCase();
-    if (activeFilter === 'pending') return statusUpper === 'PENDING';
-    if (activeFilter === 'verified') return ticket.profiles?.is_verified;
-    return true;
-  });
+  const filteredTickets = useMemo(() => {
+    const cleanQuery = searchQuery.trim().toLowerCase();
 
-  // Pantalla de carga bloqueante durante la comprobación de sesión
+    return tickets.filter(t => {
+      const statusUpper = t.status?.toUpperCase();
+
+      if (cleanQuery.length >= 2) {
+        const matchTitle = t.match_title?.toLowerCase() || '';
+        const comment = t.comment?.toLowerCase() || '';
+        const username = t.profiles?.username?.toLowerCase() || '';
+
+        const matchesSearch = 
+          matchTitle.includes(cleanQuery) || 
+          username.includes(cleanQuery) || 
+          comment.includes(cleanQuery);
+
+        if (!matchesSearch) return false;
+      }
+
+      if (activeTab === 'live' || activeTab === 'trending') return statusUpper === 'PENDING';
+      if (activeTab === 'verified') return t.profiles?.is_verified;
+      return true;
+    });
+  }, [tickets, activeTab, searchQuery]);
+
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-[#0B0E14] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Verificando Credenciales...</p>
+      <div className="min-h-screen bg-[#07090e] flex flex-col items-center justify-center space-y-3">
+        <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
+          <Zap className="w-5 h-5 fill-emerald-400" />
+        </div>
+        <p className="text-[11px] text-slate-400 font-mono tracking-wider">Cargando RadarScore Feed...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-white">
-      {/* Layout Principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Columna Izquierda: Feed */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Banner de Sección y Filtros */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-[#141A23] border border-gray-800/80 rounded-2xl p-4 gap-4">
+    <div className="min-h-screen bg-[#07090e] text-slate-100 font-sans selection:bg-emerald-500 selection:text-black">
+      
+      {/* HEADER PRINCIPAL */}
+      <section className="border-b border-slate-800/80 bg-[#0c0f17]/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-2xl mx-auto px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-black text-lg text-white flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-                Feed de Apuestas
-              </h2>
-              <p className="text-xs text-gray-400 font-medium">
-                Picks de la comunidad y tipsters verificados en tiempo real
-              </p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black text-white tracking-tight">Muro de Pronósticos</h1>
+                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full">
+                  PHOTO-FIRST
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">Capturas reales compartidas por la comunidad.</p>
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setActiveFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeFilter === 'all'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                🌐 Todos
+            <button
+              onClick={() => {
+                if (!currentUser) setIsAuthModalOpen(true);
+                else setIsCreateModalOpen(true);
+              }}
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition flex items-center gap-2 shrink-0 active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/20"
+            >
+              <Camera className="w-4 h-4 stroke-[2.5]" />
+              <span>Subir Captura</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* CONTENEDOR CENTRAL */}
+      <main className="max-w-2xl mx-auto px-4 pt-4 pb-8 space-y-4">
+        
+        {/* WIDGET RAPIDO TIPO TWITTER */}
+        <div 
+          onClick={() => {
+            if (!currentUser) setIsAuthModalOpen(true);
+            else setIsCreateModalOpen(true);
+          }}
+          className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:border-slate-700 transition shadow-sm group"
+        >
+          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+            {currentUser?.user_metadata?.avatar_url ? (
+              <img src={currentUser.user_metadata.avatar_url} alt="User" className="w-full h-full object-cover" />
+            ) : (
+              <Smile className="w-5 h-5 text-emerald-400" />
+            )}
+          </div>
+          <div className="flex-1 text-xs text-slate-400 font-medium">
+            ¿Qué jugaste hoy? Comparte tu captura aquí...
+          </div>
+          <div className="bg-emerald-500/10 text-emerald-400 p-2 rounded-xl border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-black transition">
+            <Camera className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* BUSCADOR Y FILTROS */}
+        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 space-y-2.5 shadow-sm">
+          <div className="relative w-full">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por comentario o @tipster..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#06080e] border border-slate-800 focus:border-emerald-500/50 rounded-xl pl-9 pr-24 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none transition font-medium"
+            />
+
+            {searchQuery.trim().length >= 2 && (
+              <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                {filteredTickets.length} {filteredTickets.length === 1 ? 'ticket' : 'tickets'}
+              </span>
+            )}
+
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                <X className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => setActiveFilter('pending')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeFilter === 'pending'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> En Juego
-              </button>
-              <button
-                onClick={() => setActiveFilter('verified')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeFilter === 'verified'
-                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" /> Verificados
-              </button>
-            </div>
+            )}
           </div>
 
-          {/* Lista de Tickets */}
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-48 bg-[#141A23]/50 border border-gray-800 rounded-3xl animate-pulse" />
-              ))}
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-12 text-center space-y-3">
-              <Sparkles className="w-10 h-10 text-gray-600 mx-auto" />
-              <h3 className="text-gray-300 font-bold">No hay tickets publicados aquí</h3>
-              <p className="text-xs text-gray-500">Sé el primero en compartir un pronóstico con la comunidad</p>
-            </div>
-          ) : (
-            filteredTickets.map(ticket => {
-              const statusUpper = ticket.status?.toUpperCase();
-              return (
-                <div
-                  key={ticket.id}
-                  className="bg-[#141A23] border border-gray-800 hover:border-gray-700 transition duration-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl relative overflow-hidden group"
-                >
-                  {/* Tipster Header enlazado a Perfil Público */}
-                  <div className="flex items-center justify-between">
-                    <Link
-                      href={`/perfil/${ticket.profiles?.username || 'user'}`}
-                      className="flex items-center gap-3 group/user hover:opacity-90 transition"
-                    >
-                      <img
-                        src={ticket.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                        alt="Avatar"
-                        className="w-11 h-11 rounded-full object-cover ring-2 ring-emerald-500/30 group-hover/user:ring-emerald-400 transition"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-white text-base group-hover/user:text-emerald-400 transition">
-                            {ticket.profiles?.full_name || 'RadarScore User'}
-                          </span>
-                          {ticket.profiles?.is_verified && (
-                            <span title="Tipster Verificado">
-                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>@{ticket.profiles?.username || 'user'}</span>
-                          <span>•</span>
-                          <span className="text-emerald-400 font-semibold">
-                            +{ticket.profiles?.yield_rate || 0}% Yield
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
+          <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar text-xs border-t border-slate-800/60 pt-2">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-3 py-1 rounded-lg transition font-medium shrink-0 cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-slate-800 text-emerald-400 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+              }`}
+            >
+              Todos
+            </button>
 
-                    {/* Badge de Estado */}
+            <button
+              onClick={() => setActiveTab('trending')}
+              className={`px-3 py-1 rounded-lg transition font-medium shrink-0 cursor-pointer ${
+                activeTab === 'trending'
+                  ? 'bg-slate-800 text-orange-400 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+              }`}
+            >
+              🔥 Tendencias
+            </button>
+
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`px-3 py-1 rounded-lg transition font-medium shrink-0 cursor-pointer ${
+                activeTab === 'live'
+                  ? 'bg-slate-800 text-amber-300 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+              }`}
+            >
+              En Juego
+            </button>
+
+            <button
+              onClick={() => setActiveTab('verified')}
+              className={`px-3 py-1 rounded-lg transition font-medium shrink-0 cursor-pointer ${
+                activeTab === 'verified'
+                  ? 'bg-slate-800 text-cyan-300 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+              }`}
+            >
+              Verificados
+            </button>
+          </div>
+        </div>
+
+        {/* FEED DE TICKETS */}
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2].map(i => (
+              <div key={i} className="h-80 bg-[#0c0f17]/60 border border-slate-800/80 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="bg-[#0c0f17] border border-slate-800/80 rounded-2xl p-8 text-center space-y-2">
+            <Search className="w-6 h-6 text-slate-500 mx-auto" />
+            <p className="text-xs text-slate-400">No hay capturas publicadas en esta categoría.</p>
+          </div>
+        ) : (
+          filteredTickets.map(ticket => {
+            const statusUpper = ticket.status?.toUpperCase();
+
+            let statusBorderColor = 'border-l-amber-500';
+            if (statusUpper === 'WIN' || statusUpper === 'WON') statusBorderColor = 'border-l-emerald-500';
+            if (statusUpper === 'LOSS' || statusUpper === 'LOST') statusBorderColor = 'border-l-rose-500';
+
+            return (
+              <div
+                key={ticket.id}
+                className={`bg-[#0c0f17] border-l-4 ${statusBorderColor} border-y border-r border-slate-800/90 hover:border-slate-700 transition-all rounded-2xl p-4 space-y-3 shadow-md`}
+              >
+                {/* Header del Tipster */}
+                <div className="flex items-center justify-between text-xs">
+                  <Link
+                    href={`/perfil/${ticket.profiles?.username || 'user'}`}
+                    className="flex items-center gap-2.5 hover:opacity-80 transition"
+                  >
+                    <img
+                      src={ticket.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                      alt="Avatar"
+                      className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                    />
                     <div>
-                      {statusUpper === 'PENDING' && (
-                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> En Juego
-                        </span>
-                      )}
-                      {statusUpper === 'WIN' && (
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> GANADO
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Cita de comentario */}
-                  {ticket.comment && (
-                    <div className="bg-[#0B0E14]/60 border border-gray-800/60 rounded-2xl p-3.5 text-xs text-gray-300 italic">
-                      "{ticket.comment}"
-                    </div>
-                  )}
-
-                  {/* Tarjeta de Detalles del Ticket */}
-                  <div className="bg-[#0B0E14] border border-gray-800/80 rounded-2xl p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
-                          {ticket.league}
-                        </span>
-                        <h4 className="text-base font-black text-white mt-1.5">
-                          {ticket.match_title}
-                        </h4>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-200">@{ticket.profiles?.username || 'user'}</span>
+                        {ticket.profiles?.is_verified && (
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+                        )}
                       </div>
-                      <div className="text-right">
-                        <span className="text-[11px] text-gray-400 block">Stake: ${ticket.stake} MXN</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-800/60 text-xs">
-                      <div>
-                        <span className="text-gray-400 block text-[11px]">Selección:</span>
-                        <span className="font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                          {ticket.selection}
-                        </span>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-gray-400 block text-[11px]">Cuota:</span>
-                        <span className="font-black text-amber-400 text-sm">@{ticket.odds}</span>
-                      </div>
-                    </div>
-
-                    {/* Estimación de Retorno */}
-                    <div className="bg-emerald-950/20 border border-emerald-500/10 rounded-xl p-2.5 flex justify-between items-center text-xs">
-                      <span className="text-gray-400">Ganancia Potencial:</span>
-                      <span className="font-black text-emerald-400">
-                        ${(ticket.potential_payout || ticket.stake * ticket.odds).toFixed(2)} MXN
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {new Date(ticket.created_at).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
+                  </Link>
+
+                  <div>
+                    {statusUpper === 'PENDING' && (
+                      <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> PENDIENTE
+                      </span>
+                    )}
+                    {(statusUpper === 'WIN' || statusUpper === 'WON') && (
+                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Check className="w-3 h-3" /> GANADO
+                      </span>
+                    )}
+                    {(statusUpper === 'LOSS' || statusUpper === 'LOST') && (
+                      <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <X className="w-3 h-3" /> PERDIDO
+                      </span>
+                    )}
                   </div>
+                </div>
 
-                  {/* Barra de Interacción Social */}
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2">
-                      {/* Botón Reacción Fuego */}
-                      <button
-                        onClick={() => handleReaction(ticket.id)}
-                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition cursor-pointer ${
-                          ticket.user_reacted
-                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-                            : 'bg-[#0B0E14] text-gray-400 border-gray-800 hover:text-white'
-                        }`}
-                      >
-                        <Flame className={`w-4 h-4 ${ticket.user_reacted ? 'fill-orange-400 text-orange-400' : ''}`} />
-                        <span>{ticket.reactions_count || 0}</span>
-                      </button>
+                {/* Comentario / Leyenda Principal */}
+                {ticket.comment && (
+                  <p className="text-xs text-slate-200 leading-relaxed font-medium">
+                    {ticket.comment}
+                  </p>
+                )}
 
-                      {/* Botón Desplegar Comentarios */}
-                      <button
-                        onClick={() => toggleComments(ticket.id)}
-                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition cursor-pointer ${
-                          expandedTicketId === ticket.id
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                            : 'bg-[#0B0E14] text-gray-400 border-gray-800 hover:text-white'
-                        }`}
-                      >
-                        <MessageSquare className="w-4 h-4 text-cyan-400" />
-                        <span>{ticket.comments_count || 0}</span>
-                      </button>
-                    </div>
-
-                    {/* Botón Copiar Apuesta */}
-                    <button
-                      onClick={() => handleCopy(ticket)}
-                      className="flex items-center gap-1.5 text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl transition cursor-pointer"
+                {/* 📸 CAPTURA PRINCIPAL DEL TICKET */}
+                <div className="relative group rounded-2xl overflow-hidden border border-slate-800 bg-[#06080e]">
+                  {ticket.image_url ? (
+                    <div 
+                      onClick={() => setSelectedImage(ticket.image_url!)}
+                      className="cursor-pointer relative overflow-hidden"
                     >
-                      {copiedId === ticket.id ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400" />
-                          <span>¡Copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          <span>Copiar Apuesta</span>
-                        </>
-                      )}
+                      <img
+                        src={ticket.image_url}
+                        alt="Captura de Apuesta"
+                        className="w-full h-auto max-h-[450px] object-cover sm:object-contain bg-black/40 group-hover:scale-[1.01] transition duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs backdrop-blur-[2px]">
+                        <Maximize2 className="w-4 h-4 text-emerald-400" />
+                        <span>Ver imagen completa</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center space-y-2 bg-gradient-to-b from-[#090d16] to-[#06080e]">
+                      <ImageIcon className="w-8 h-8 text-slate-600 mx-auto" />
+                      <p className="text-xs text-slate-400 font-mono">Sin captura adjunta</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Reacciones + Comentarios */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleReaction(ticket.id, 'FIRE')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer active:scale-95 ${
+                        ticket.user_reacted
+                          ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                          : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Flame className={`w-3.5 h-3.5 ${ticket.user_reacted ? 'fill-orange-400 text-orange-400' : ''}`} />
+                      <span>{ticket.reactions_count || 0}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleReaction(ticket.id, 'ROCKET')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer active:scale-95 ${
+                        ticket.user_rocket
+                          ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                          : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Rocket className={`w-3.5 h-3.5 ${ticket.user_rocket ? 'fill-purple-400 text-purple-300' : ''}`} />
+                      <span>{ticket.rockets_count || 0}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleReaction(ticket.id, 'FADE')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer active:scale-95 ${
+                        ticket.user_fade
+                          ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                          : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Snowflake className={`w-3.5 h-3.5 ${ticket.user_fade ? 'text-cyan-300' : ''}`} />
+                      <span>{ticket.fades_count || 0}</span>
+                    </button>
+
+                    <button
+                      onClick={() => toggleComments(ticket.id)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer active:scale-95 ${
+                        expandedTicketId === ticket.id
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{ticket.comments_count || 0}</span>
                     </button>
                   </div>
 
-                  {/* DESPLEGABLE DE COMENTARIOS */}
-                  {expandedTicketId === ticket.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-800/80 space-y-4 animate-fadeIn">
-                      <h5 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
-                        Comentarios y Opiniones
-                      </h5>
-
-                      {/* Lista de comentarios */}
-                      {loadingComments === ticket.id ? (
-                        <div className="flex items-center justify-center py-4 text-gray-400 gap-2 text-xs">
-                          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                          <span>Cargando comentarios...</span>
-                        </div>
-                      ) : !ticketComments[ticket.id] || ticketComments[ticket.id].length === 0 ? (
-                        <p className="text-xs text-gray-500 italic py-2">
-                          Aún no hay comentarios. ¡Sé el primero en dejar una opinión!
-                        </p>
-                      ) : (
-                        <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                          {ticketComments[ticket.id].map(comment => (
-                            <div key={comment.id} className="bg-[#0B0E14] border border-gray-800/60 rounded-xl p-3 space-y-1 text-xs">
-                              <div className="flex items-center justify-between">
-                                <Link 
-                                  href={`/perfil/${comment.profiles?.username || 'user'}`}
-                                  className="font-bold text-emerald-400 hover:underline"
-                                >
-                                  @{comment.profiles?.username || 'usuario'}
-                                </Link>
-                                <span className="text-[10px] text-gray-500">
-                                  {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                              <p className="text-gray-300 leading-relaxed">{comment.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Input para agregar comentario */}
-                      <div className="flex gap-2 pt-1">
-                        <input
-                          type="text"
-                          placeholder={currentUser ? "Escribe un comentario..." : "Inicia sesión para comentar"}
-                          disabled={!currentUser || postingComment}
-                          value={newCommentInput}
-                          onChange={(e) => setNewCommentInput(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddComment(ticket.id)}
-                          className="flex-1 bg-[#0B0E14] border border-gray-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
-                        />
-                        <button
-                          onClick={() => handleAddComment(ticket.id)}
-                          disabled={!currentUser || postingComment || !newCommentInput.trim()}
-                          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black p-2.5 rounded-xl transition flex items-center justify-center cursor-pointer"
-                        >
-                          {postingComment ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Columna Derecha: Ranking Dinámico de Top Tipsters */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-400" />
-              <h3 className="font-black text-sm text-white">Top Tipsters del Mes</h3>
-            </div>
-            
-            <div className="space-y-3">
-              {topTipsters.length === 0 ? (
-                <div className="text-xs text-gray-500 text-center py-4">
-                  Cargando clasificación...
-                </div>
-              ) : (
-                topTipsters.map((tipster, i) => (
-                  <Link 
-                    key={tipster.id} 
-                    href={`/perfil/${tipster.username}`}
-                    className="flex items-center justify-between p-2.5 bg-[#0B0E14] hover:bg-[#0F141C] border border-gray-800/50 hover:border-emerald-500/30 rounded-2xl text-xs transition cursor-pointer group"
+                  <button
+                    onClick={() => handleCopy(ticket)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-black text-amber-400 w-4 text-center">#{i+1}</span>
-                      <img 
-                        src={tipster.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                        alt="Avatar"
-                        className="w-7 h-7 rounded-full object-cover ring-1 ring-emerald-500/20 group-hover:ring-emerald-400 transition"
-                      />
-                      <div>
-                        <span className="font-bold text-white block group-hover:text-emerald-400 transition">{tipster.full_name || tipster.username}</span>
-                        <span className="text-[10px] text-gray-500">@{tipster.username}</span>
+                    {copiedId === ticket.id ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>¡Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Compartir</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Comentarios desplegables */}
+                {expandedTicketId === ticket.id && (
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5 animate-fadeIn">
+                    {loadingComments === ticket.id ? (
+                      <div className="flex items-center justify-center py-2 text-slate-400 text-xs gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                        <span>Cargando comentarios...</span>
                       </div>
+                    ) : !ticketComments[ticket.id] || ticketComments[ticket.id].length === 0 ? (
+                      <p className="text-xs text-slate-500 italic py-1">Sé el primero en comentar esta jugada.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                        {ticketComments[ticket.id].map(comment => (
+                          <div key={comment.id} className="bg-[#06080e] border border-slate-800/80 rounded-xl p-2.5 text-xs space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-emerald-400 text-[11px]">@{comment.profiles?.username || 'usuario'}</span>
+                              <span className="text-[9px] text-slate-500 font-mono">
+                                {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-slate-300 text-xs">{comment.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-1.5 pt-1">
+                      <input
+                        type="text"
+                        placeholder={currentUser ? "Escribe un comentario..." : "Inicia sesión para comentar"}
+                        disabled={!currentUser || postingComment}
+                        value={newCommentInput}
+                        onChange={(e) => setNewCommentInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddComment(ticket.id)}
+                        className="flex-1 bg-[#06080e] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                      />
+                      <button
+                        onClick={() => handleAddComment(ticket.id)}
+                        disabled={!currentUser || postingComment || !newCommentInput.trim()}
+                        className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold px-3 py-1.5 rounded-lg transition text-xs flex items-center justify-center cursor-pointer"
+                      >
+                        {postingComment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
-                    <div className="text-right">
-                      <span className={`font-extrabold block ${tipster.yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                        {tipster.yield_rate > 0 ? `+${tipster.yield_rate}` : tipster.yield_rate}%
-                      </span>
-                      <span className="text-[10px] text-gray-500">{tipster.win_rate || 0}% aciertos</span>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Modal para Crear Ticket */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-[#141A23] border border-gray-800 rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl">
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-white transition bg-gray-800/50 p-2 rounded-full cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="space-y-1">
-              <h3 className="text-xl font-black text-white">Publicar Nuevo Ticket</h3>
-              <p className="text-xs text-gray-400">Comparte tu análisis con la comunidad de RadarScore</p>
-            </div>
-
-            <form onSubmit={handleCreateTicket} className="space-y-3.5 text-xs">
-              <div className="relative">
-                <label className="block text-gray-300 font-bold mb-1">Buscar Partido</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Santos Laguna vs Club América"
-                  value={matchTitle}
-                  onChange={(e) => {
-                    setMatchTitle(e.target.value);
-                    setShowMatchSuggestions(true);
-                  }}
-                  className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                  required
-                />
-                
-                {showMatchSuggestions && matches.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#141A23] border border-gray-800 rounded-xl max-h-40 overflow-y-auto z-50 shadow-2xl">
-                    {matches
-                      .filter(m => `${m.home_team} vs ${m.away_team}`.toLowerCase().includes(matchTitle.toLowerCase()))
-                      .map(m => (
-                        <div
-                          key={m.id}
-                          onClick={() => {
-                            setMatchTitle(`${m.home_team} vs ${m.away_team}`);
-                            setLeague(m.league || 'Liga MX 🇲🇽');
-                            setShowMatchSuggestions(false);
-                          }}
-                          className="p-2.5 hover:bg-emerald-500/10 cursor-pointer text-gray-300 hover:text-emerald-400 border-b border-gray-800/50 last:border-none"
-                        >
-                          <span className="font-bold">{m.home_team} vs {m.away_team}</span>
-                          <span className="text-[10px] text-gray-500 block">{m.league}</span>
-                        </div>
-                      ))}
                   </div>
                 )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">Liga</label>
-                  <input
-                    type="text"
-                    value={league}
-                    onChange={(e) => setLeague(e.target.value)}
-                    className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">Selección / Pronóstico</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: Ambos Anotan"
-                    value={selection}
-                    onChange={(e) => setPrediction(e.target.value)}
-                    className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
-                </div>
               </div>
+            );
+          })
+        )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">Cuota (@)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="1.85"
-                    value={odds}
-                    onChange={(e) => setOdds(e.target.value)}
-                    className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-bold mb-1">Stake (Monto MXN)</label>
-                  <input
-                    type="number"
-                    placeholder="100"
-                    value={stake}
-                    onChange={(e) => setStake(e.target.value)}
-                    className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
-                </div>
+      </main>
+
+      {/* LIGHTBOX AMPLIFICADOR */}
+      {selectedImage && (
+        <div 
+          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn cursor-zoom-out"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-xl w-full bg-[#0c0f17] border border-emerald-500/30 rounded-3xl overflow-hidden p-3 shadow-[0_0_50px_rgba(16,185,129,0.2)]"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 px-2">
+              <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400">
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Captura de Ticket Ampliada</span>
               </div>
-
-              <div>
-                <label className="block text-gray-300 font-bold mb-1">Análisis o Comentario</label>
-                <textarea
-                  placeholder="¿Por qué crees que se dará esta apuesta?"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={3}
-                  className="w-full bg-[#0B0E14] border border-gray-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
               <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                onClick={() => setSelectedImage(null)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-xl transition cursor-pointer"
               >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publicar Apuesta'}
+                <X className="w-4 h-4" />
               </button>
-            </form>
+            </div>
+
+            <img
+              src={selectedImage}
+              alt="Ticket Real Ampliado"
+              className="w-full h-auto max-h-[80vh] object-contain rounded-2xl border border-slate-800"
+            />
           </div>
         </div>
       )}
 
-      {/* Modal de Autenticación */}
+      {/* MODAL DE PUBLICACIÓN CLEAN */}
+      <CreatePickModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          fetchTickets();
+        }}
+      />
+
+      {/* MODAL DE AUTENTICACIÓN */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={() => {
-          checkUser();
-          fetchTickets();
-          fetchTopTipsters();
+          checkUserAndInit();
         }}
       />
+
+    </div>
+  );
+}
+
+{/* 🏆 MODAL DE PUBLICACIÓN MINIMALISTA & ULTRA CLEAN (TWITTER/X STYLE) 🏆 */}
+function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess?: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [comment, setComment] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>('🎯 Pick del Día');
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const QUICK_TAGS = ['🎯 Pick del Día', '🔥 All-In', '🚀 Confiado', '💎 Cuota Alta', '⚡ En Vivo'];
+
+  const resetForm = () => {
+    setComment('');
+    setImageFile(null);
+    setImagePreview(null);
+    setSelectedTag('🎯 Pick del Día');
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!imageFile && !imagePreview) {
+      alert('Por favor selecciona una captura de tu ticket.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert('Debes iniciar sesión para publicar.');
+        setLoading(false);
+        return;
+      }
+
+      let imageUrl: string | null = null;
+
+      if (imageFile) {
+        try {
+          const fileExt = imageFile.name.split('.').pop();
+          const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+          const filePath = `ticket-screenshots/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('ticket-screenshots')
+            .upload(filePath, imageFile);
+
+          if (!uploadError) {
+            const { data: publicUrlData } = supabase.storage
+              .from('ticket-screenshots')
+              .getPublicUrl(filePath);
+            imageUrl = publicUrlData.publicUrl;
+          } else {
+            imageUrl = imagePreview;
+          }
+        } catch {
+          imageUrl = imagePreview;
+        }
+      } else if (imagePreview) {
+        imageUrl = imagePreview;
+      }
+
+      const finalComment = selectedTag ? `[${selectedTag}] ${comment.trim()}`.trim() : comment.trim();
+
+      const { error } = await supabase.from('tickets').insert([
+        {
+          user_id: user.id,
+          league: 'Captura Comunidad',
+          match_title: 'Ticket de Apuesta',
+          selection: selectedTag || 'Ver Ticket',
+          odds: 1.00,
+          stake: 100,
+          potential_payout: 100,
+          comment: finalComment || null,
+          image_url: imageUrl,
+          status: 'PENDING'
+        }
+      ]);
+
+      if (error) throw error;
+
+      resetForm();
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err: any) {
+      alert('Error al publicar captura: ' + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div 
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+    >
+      <div className="bg-[#0B0E14] border border-slate-800 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl relative text-white">
+        
+        {/* Header Limpio */}
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <Camera className="w-4 h-4 text-emerald-400" />
+            <span>Publicar Ticket</span>
+          </h2>
+
+          <button
+            type="button"
+            onClick={handleClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          
+          {/* 1. Mensaje de Texto (Estilo Twitter) */}
+          <textarea
+            rows={2}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="¿Qué jugaste hoy? Agrega un comentario opcional..."
+            className="w-full bg-[#06080e] border border-slate-800/90 rounded-xl p-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none text-xs font-medium"
+          />
+
+          {/* 2. Zona de Carga de Captura (Minimalista) */}
+          <div className="border border-dashed border-slate-700/80 hover:border-emerald-500/60 rounded-xl p-3 bg-[#06080e] text-center cursor-pointer transition relative group">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+            />
+            
+            {imagePreview ? (
+              <div className="relative inline-block w-full">
+                <img src={imagePreview} alt="Preview" className="max-h-48 rounded-lg border border-slate-800 mx-auto object-contain" />
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                  className="absolute top-1.5 right-1.5 bg-rose-500/90 text-white rounded-full p-1 hover:bg-rose-600 transition z-20 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2.5 py-3 text-slate-400">
+                <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-xs font-medium text-slate-300">Haz clic para adjuntar la imagen del ticket</span>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Etiqueta / Tag Rápida (1 sola fila limpia) */}
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[10px] font-mono text-slate-400 block font-semibold uppercase">Etiqueta opcional</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+              {QUICK_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition shrink-0 border cursor-pointer ${
+                    selectedTag === tag
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 font-bold'
+                      : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Botón de Publicar */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading || (!imageFile && !imagePreview)}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 shadow-md shadow-emerald-500/20"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+                  <span>Publicar Ticket</span>
+                </>
+              )}
+            </button>
+          </div>
+
+        </form>
+
+      </div>
     </div>
   );
 }

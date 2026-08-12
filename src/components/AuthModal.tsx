@@ -98,6 +98,12 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
         if (error) throw error;
 
+        // 💡 VALIDACIÓN DE CORREO DUPLICADO:
+        // Supabase devuelve `identities` como array vacío si el correo ya existe
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+          throw new Error('Este correo electrónico ya está registrado. Por favor, inicia sesión.');
+        }
+
         // Si requiere confirmación por correo (session = null)
         if (data.user && !data.session) {
           setSuccessMsg(

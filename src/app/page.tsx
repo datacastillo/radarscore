@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from '@/components/AuthModal';
+import { supabase } from '@/lib/supabase';
 import { 
   ShieldCheck, 
   Bot, 
@@ -13,27 +14,22 @@ import {
   Users,
   Zap, 
   ChevronRight, 
-  Sparkles, 
-  Radio, 
   Activity,
   TrendingUp,
   Terminal,
   Award,
   Copy,
   Check,
-  BarChart3,
-  Eye,
-  Trophy,
   Lock,
   Bell,
   Cpu,
-  CheckCircle2,
-  LineChart
+  LogOut
 } from 'lucide-react';
 
 export default function DefinitiveHomePage() {
-  // ESTADO DEL MODAL DE AUTENTICACIÓN
+  // ESTADO DEL MODAL DE AUTENTICACIÓN Y USUARIO
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
   // EFECTO BOOTLOADER CON CONTADOR
@@ -53,6 +49,23 @@ export default function DefinitiveHomePage() {
   // CONSOLA TÁCTICA & COPIADO
   const [activeTab, setActiveTab] = useState<'ai' | 'stats' | 'ranking'>('ai');
   const [copied, setCopied] = useState(false);
+
+  // Verificar estado de la sesión
+  useEffect(() => {
+    const checkUserSession = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUserSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Secuencia de Carga Inicial
   useEffect(() => {
@@ -86,6 +99,13 @@ export default function DefinitiveHomePage() {
   // Redirección al autenticarse exitosamente
   const handleAuthSuccess = () => {
     router.push('/comunidad');
+  };
+
+  // Función para cerrar sesión
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    router.refresh();
   };
 
   return (
@@ -201,24 +221,36 @@ export default function DefinitiveHomePage() {
           </p>
         </div>
 
-        {/* Botones de Acción (Activadores del Modal) */}
+        {/* Botones de Acción Inteligentes según Sesión */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           <button
-            onClick={() => setIsAuthOpen(true)}
-            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-black font-black px-8 py-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/30 flex items-center justify-center gap-3 text-sm shadow-xl shadow-emerald-500/20 group relative overflow-hidden active:scale-95"
+            onClick={() => user ? router.push('/comunidad') : setIsAuthOpen(true)}
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-black font-black px-8 py-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/30 flex items-center justify-center gap-3 text-sm shadow-xl shadow-emerald-500/20 group relative overflow-hidden active:scale-95 cursor-pointer"
           >
             <Zap className="w-5 h-5 fill-black" />
-            <span>Explorar RadarApp</span>
+            <span>{user ? 'Ir a la Comunidad' : 'Explorar RadarApp'}</span>
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </button>
 
           <button
-            onClick={() => setIsAuthOpen(true)}
-            className="w-full sm:w-auto bg-[#121721] hover:bg-gray-800 text-gray-200 border border-gray-800 hover:border-emerald-500/30 px-8 py-4 rounded-2xl transition-all duration-300 font-bold flex items-center justify-center gap-3 text-sm backdrop-blur-md active:scale-95"
+            onClick={() => user ? router.push('/perfil') : setIsAuthOpen(true)}
+            className="w-full sm:w-auto bg-[#121721] hover:bg-gray-800 text-gray-200 border border-gray-800 hover:border-emerald-500/30 px-8 py-4 rounded-2xl transition-all duration-300 font-bold flex items-center justify-center gap-3 text-sm backdrop-blur-md active:scale-95 cursor-pointer"
           >
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
-            <span>Mi Perfil de Tipster</span>
+            <span>{user ? 'Ver Mi Perfil' : 'Mi Perfil de Tipster'}</span>
           </button>
+
+          {/* Botón rápido de Salir si hay sesión iniciada */}
+          {user && (
+            <button
+              onClick={handleLogout}
+              className="w-full sm:w-auto bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-5 py-4 rounded-2xl transition-all duration-300 font-bold flex items-center justify-center gap-2 text-sm cursor-pointer"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Salir</span>
+            </button>
+          )}
         </div>
 
         {/* CINTA DE SEÑALES EN VIVO (MARQUEE TICKER) */}
@@ -297,7 +329,7 @@ export default function DefinitiveHomePage() {
             <div className="flex bg-[#07090E] p-1 rounded-xl border border-gray-800 w-full sm:w-auto justify-center">
               <button
                 onClick={() => setActiveTab('ai')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'ai' 
                     ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20' 
                     : 'text-gray-400 hover:text-white'
@@ -308,7 +340,7 @@ export default function DefinitiveHomePage() {
 
               <button
                 onClick={() => setActiveTab('stats')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'stats' 
                     ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20' 
                     : 'text-gray-400 hover:text-white'
@@ -319,7 +351,7 @@ export default function DefinitiveHomePage() {
 
               <button
                 onClick={() => setActiveTab('ranking')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'ranking' 
                     ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20' 
                     : 'text-gray-400 hover:text-white'
@@ -393,7 +425,7 @@ export default function DefinitiveHomePage() {
 
                   <button 
                     onClick={handleCopy}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-4 py-2 rounded-xl transition text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-4 py-2 rounded-xl transition text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 cursor-pointer"
                   >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? '¡Copiado!' : 'Copiar Selección'}</span>
@@ -626,10 +658,10 @@ export default function DefinitiveHomePage() {
 
           <div className="pt-2">
             <button
-              onClick={() => setIsAuthOpen(true)}
-              className="inline-flex items-center gap-2 bg-black hover:bg-gray-900 text-white font-black px-8 py-4 rounded-2xl transition shadow-xl text-sm active:scale-95"
+              onClick={() => user ? router.push('/comunidad') : setIsAuthOpen(true)}
+              className="inline-flex items-center gap-2 bg-black hover:bg-gray-900 text-white font-black px-8 py-4 rounded-2xl transition shadow-xl text-sm active:scale-95 cursor-pointer"
             >
-              <span>Comenzar Ahora Gratis</span>
+              <span>{user ? 'Ir a la Comunidad' : 'Comenzar Ahora Gratis'}</span>
               <ChevronRight className="w-4 h-4 text-emerald-400" />
             </button>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -12,16 +12,59 @@ import {
   ArrowRight
 } from 'lucide-react';
 import AuthModal from '@/components/AuthModal';
+import CreatePickModal from '@/components/CreatePickModal';
+import { supabase } from '@/lib/supabase';
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const isHomePage = pathname === '/';
   
-  // Estado para controlar el modal de autenticación
+  // Estado para el modal de autenticación
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // Función que se ejecuta al iniciar sesión/registrarse exitosamente
+  // Estado para el modal de publicar pick
+  const [isCreatePickOpen, setIsCreatePickOpen] = useState(false);
+
+  // Estado para el rol del usuario ('admin', 'user', etc.)
+  const [userRol, setUserRol] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserRol = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+        
+        setUserRol(profile?.rol || null);
+      } else {
+        setUserRol(null);
+      }
+    };
+
+    fetchUserRol();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol')
+          .eq('id', session.user.id)
+          .single();
+        setUserRol(profile?.rol || null);
+      } else {
+        setUserRol(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleAuthSuccess = () => {
     router.push('/comunidad');
   };
@@ -37,22 +80,25 @@ export default function Navbar() {
       href: '/perfil',
       icon: User,
     },
-    {
-      label: 'Admin',
-      href: '/admin',
-      icon: ShieldAlert,
-      isAdmin: true,
-    },
+    ...(userRol === 'admin'
+      ? [
+          {
+            label: 'Admin',
+            href: '/admin',
+            icon: ShieldAlert,
+            isAdmin: true,
+          },
+        ]
+      : []),
   ];
 
-  // 1️⃣ NAVBAR LIMPIO PARA LA LANDING PAGE DE BIENVENIDA (RUTA '/')
+  // 1️⃣ NAVBAR PARA LA LANDING PAGE (RUTA '/')
   if (isHomePage) {
     return (
       <>
         <header className="sticky top-0 z-50 bg-[#0B0E14]/90 backdrop-blur-md border-b border-gray-800/80 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto h-16 flex items-center justify-between gap-4">
             
-            {/* Logo Brand */}
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20 group-hover:bg-emerald-500/20 transition">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -62,7 +108,6 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* Botón Acción para la Landing (Abre el AuthModal) */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -77,7 +122,6 @@ export default function Navbar() {
           </div>
         </header>
 
-        {/* Modal de Autenticación */}
         <AuthModal 
           isOpen={isAuthOpen} 
           onClose={() => setIsAuthOpen(false)} 
@@ -87,13 +131,12 @@ export default function Navbar() {
     );
   }
 
-  // 2️⃣ NAVBAR ORIGINAL COMPLETO PARA DENTRO DE LA APP
+  // 2️⃣ NAVBAR COMPLETO DENTRO DE LA APP
   return (
     <>
       <header className="sticky top-0 z-50 bg-[#0B0E14]/90 backdrop-blur-md border-b border-gray-800/80 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto h-16 flex items-center justify-between gap-4">
           
-          {/* Logo Brand */}
           <Link href="/comunidad" className="flex items-center gap-2.5 group">
             <div className="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20 group-hover:bg-emerald-500/20 transition">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -103,7 +146,6 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Navigation Links */}
           <nav className="flex items-center gap-1 sm:gap-2 bg-[#141A23] p-1.5 rounded-2xl border border-gray-800/80">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -131,25 +173,32 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* CTA Button */}
           <div className="flex items-center gap-3">
-            <Link
-              href="/comunidad"
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95"
+            <button
+              type="button"
+              onClick={() => setIsCreatePickOpen(true)}
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Publicar Pick</span>
-            </Link>
+            </button>
           </div>
 
         </div>
       </header>
 
-      {/* Modal de Autenticación */}
       <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
         onSuccess={handleAuthSuccess}
+      />
+
+      <CreatePickModal 
+        isOpen={isCreatePickOpen} 
+        onClose={() => setIsCreatePickOpen(false)} 
+        onSuccess={() => {
+          router.refresh();
+        }}
       />
     </>
   );

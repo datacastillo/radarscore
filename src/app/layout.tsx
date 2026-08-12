@@ -26,11 +26,17 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-[#0B0E14] text-white selection:bg-emerald-500 selection:text-black">
+      <body className="min-h-full flex flex-col bg-[#0B0E14] text-white selection:bg-emerald-500 selection:text-black font-sans">
+        {/* Navbar Global */}
         <Navbar />
-        <main className="flex-1">{children}</main>
+
+        {/* Contenido Dinámico */}
+        <main className="flex-1 w-full relative">
+          {children}
+        </main>
       </body>
     </html>
   );

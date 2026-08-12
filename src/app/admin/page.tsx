@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
   ShieldAlert, 
@@ -33,14 +34,47 @@ interface TicketAdmin {
 }
 
 export default function AdminPanelPage() {
+  const router = useRouter();
+  const [authChecking, setAuthChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketAdmin[]>([]);
   const [filterMatch, setFilterMatch] = useState('');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPendingTickets();
-  }, []);
+    const verifyAdminAndFetch = async () => {
+      try {
+        // 1. Verificar si hay usuario activo
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          router.push('/');
+          return;
+        }
+
+        // 2. Verificar si el usuario tiene rol de admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.rol !== 'admin') {
+          router.push('/comunidad');
+          return;
+        }
+
+        // 3. Permisos confirmados -> Desactivar bloqueo y cargar tickets
+        setAuthChecking(false);
+        fetchPendingTickets();
+      } catch (err) {
+        console.error('Error al verificar permisos de admin:', err);
+        router.push('/comunidad');
+      }
+    };
+
+    verifyAdminAndFetch();
+  }, [router]);
 
   const fetchPendingTickets = async () => {
     setLoading(true);
@@ -96,6 +130,18 @@ export default function AdminPanelPage() {
     (t.profiles?.username || '').toLowerCase().includes(filterMatch.toLowerCase())
   );
 
+  // Pantalla de verificación previa
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#0B0E14] text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 bg-[#141A23] border border-gray-800 p-6 rounded-2xl shadow-2xl">
+          <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+          <span className="text-xs font-bold text-gray-300">Verificando credenciales de administrador...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -116,7 +162,7 @@ export default function AdminPanelPage() {
 
           <button
             onClick={fetchPendingTickets}
-            className="bg-[#0B0E14] hover:bg-gray-800 text-gray-300 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 border border-gray-800 transition"
+            className="bg-[#0B0E14] hover:bg-gray-800 text-gray-300 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 border border-gray-800 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Actualizar Lista
@@ -201,7 +247,7 @@ export default function AdminPanelPage() {
                   <button
                     disabled={resolvingId === ticket.id}
                     onClick={() => handleResolve(ticket, 'WIN')}
-                    className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5"
+                    className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {resolvingId === ticket.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -216,7 +262,7 @@ export default function AdminPanelPage() {
                   <button
                     disabled={resolvingId === ticket.id}
                     onClick={() => handleResolve(ticket, 'LOSS')}
-                    className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5"
+                    className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {resolvingId === ticket.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
