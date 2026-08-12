@@ -60,7 +60,6 @@ export default function MiPerfilPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
 
-  // Estados para Edición de Perfil
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -68,10 +67,7 @@ export default function MiPerfilPage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [bio, setBio] = useState('');
 
-  // Estado para copiar enlace de compartir
   const [copiedLink, setCopiedLink] = useState(false);
-
-  // Modal Auth si no está logueado
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
@@ -91,7 +87,6 @@ export default function MiPerfilPage() {
 
       const userId = session.user.id;
 
-      // 1. Cargar Perfil
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -106,7 +101,6 @@ export default function MiPerfilPage() {
         setBio(profileData.bio || '');
       }
 
-      // 2. Cargar Mis Tickets
       const { data: ticketsData } = await supabase
         .from('tickets')
         .select('*')
@@ -208,7 +202,6 @@ export default function MiPerfilPage() {
     );
   }
 
-  // 🧠 CÁLCULO DE LISTAS Y ESTADÍSTICAS ROBUSTAS (WON / WIN / LOST / LOSS)
   const isPending = (st: string) => st?.toUpperCase() === 'PENDING';
   const isWon = (st: string) => st?.toUpperCase() === 'WON' || st?.toUpperCase() === 'WIN';
   const isLost = (st: string) => st?.toUpperCase() === 'LOST' || st?.toUpperCase() === 'LOSS';
@@ -218,7 +211,6 @@ export default function MiPerfilPage() {
   const wonTickets = tickets.filter(t => isWon(t.status)).length;
   const lostTickets = tickets.filter(t => isLost(t.status)).length;
 
-  // 🎯 REGLA PASO 4: Excluimos Parlays Soñadores (odds >= 10.0 o is_dreamer) del Yield %
   const eligibleYieldTickets = historyTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
   
   let totalStakedYield = 0;
@@ -238,11 +230,9 @@ export default function MiPerfilPage() {
   const eligibleWonCount = eligibleYieldTickets.filter(t => isWon(t.status)).length;
   const calculatedWinRate = eligibleYieldTickets.length > 0 ? (eligibleWonCount / eligibleYieldTickets.length) * 100 : 0;
 
-  // Mostramos el valor calculado si existe actividad, de lo contrario el de Supabase
   const displayYield = eligibleYieldTickets.length > 0 ? calculatedYieldRate.toFixed(2) : (profile.yield_rate || 0);
   const displayWinRate = eligibleYieldTickets.length > 0 ? calculatedWinRate.toFixed(1) : (profile.win_rate || 0);
 
-  // Ganancia Total Neta incluyendo Soñadores
   let globalNetProfit = 0;
   historyTickets.forEach(t => {
     const stake = t.stake || 100;
@@ -259,11 +249,9 @@ export default function MiPerfilPage() {
     <div className="min-h-screen bg-[#0B0E14] text-white py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* Tarjeta de Perfil Principal */}
         <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-10 -top-10 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Formulario de Edición o Vista Normal */}
           {isEditing ? (
             <form onSubmit={handleSaveProfile} className="space-y-4 animate-fadeIn">
               <div className="flex justify-between items-center border-b border-gray-800 pb-3">
@@ -371,7 +359,6 @@ export default function MiPerfilPage() {
                 </div>
               </div>
 
-              {/* Botones de Acción */}
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsEditing(true)}
@@ -410,7 +397,6 @@ export default function MiPerfilPage() {
             </div>
           )}
 
-          {/* Grid de Métricas Oficiales (Yield sin Soñadores) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-gray-800/80">
             <div className="bg-[#0B0E14] border border-gray-800/80 p-3.5 rounded-2xl text-center space-y-0.5">
               <span className="text-[11px] text-gray-400 font-bold flex items-center justify-center gap-1">
@@ -450,7 +436,6 @@ export default function MiPerfilPage() {
           </div>
         </div>
 
-        {/* Pestañas para Mis Tickets */}
         <div className="space-y-4">
           <div className="flex border-b border-gray-800 gap-6">
             <button
@@ -478,7 +463,6 @@ export default function MiPerfilPage() {
             </button>
           </div>
 
-          {/* Lista de Mis Apuestas */}
           {activeTab === 'pending' ? (
             pendingTickets.length === 0 ? (
               <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-12 text-center text-gray-500 text-xs">

@@ -23,7 +23,8 @@ import {
   ImageIcon,
   Smile,
   Sparkles,
-  Share2
+  Share2,
+  Target
 } from 'lucide-react';
 
 interface Ticket {
@@ -37,7 +38,8 @@ interface Ticket {
   potential_payout?: number;
   comment?: string;
   image_url?: string;
-  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost' | 'VOID';
+  is_dreamer?: boolean;
+  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost' | 'VOID' | string;
   created_at: string;
   reactions_count?: number;
   rockets_count?: number;
@@ -413,7 +415,7 @@ export default function ComunidadPage() {
       {/* CONTENEDOR CENTRAL */}
       <main className="max-w-2xl mx-auto px-4 pt-4 pb-8 space-y-4">
         
-        {/* WIDGET RAPIDO TIPO TWITTER */}
+        {/* WIDGET RÁPIDO */}
         <div 
           onClick={() => {
             if (!currentUser) setIsAuthModalOpen(true);
@@ -523,6 +525,7 @@ export default function ComunidadPage() {
         ) : (
           filteredTickets.map(ticket => {
             const statusUpper = ticket.status?.toUpperCase();
+            const isDreamer = ticket.is_dreamer || (ticket.odds && ticket.odds >= 10.0);
 
             let statusBorderColor = 'border-l-amber-500';
             if (statusUpper === 'WIN' || statusUpper === 'WON') statusBorderColor = 'border-l-emerald-500';
@@ -533,7 +536,7 @@ export default function ComunidadPage() {
                 key={ticket.id}
                 className={`bg-[#0c0f17] border-l-4 ${statusBorderColor} border-y border-r border-slate-800/90 hover:border-slate-700 transition-all rounded-2xl p-4 space-y-3 shadow-md`}
               >
-                {/* Header del Tipster */}
+                {/* Header del Tipster & Badges */}
                 <div className="flex items-center justify-between text-xs">
                   <Link
                     href={`/perfil/${ticket.profiles?.username || 'user'}`}
@@ -557,7 +560,14 @@ export default function ComunidadPage() {
                     </div>
                   </Link>
 
-                  <div>
+                  <div className="flex items-center gap-1.5">
+                    {/* Insignia Parlay Soñador */}
+                    {isDreamer && (
+                      <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                      </span>
+                    )}
+
                     {statusUpper === 'PENDING' && (
                       <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> PENDIENTE
@@ -581,6 +591,21 @@ export default function ComunidadPage() {
                   <p className="text-xs text-slate-200 leading-relaxed font-medium">
                     {ticket.comment}
                   </p>
+                )}
+
+                {/* Información de Selección/Cuota (Si aplica) */}
+                {ticket.selection && ticket.selection !== 'Ver Ticket' && (
+                  <div className="bg-[#06080e] border border-slate-800/80 rounded-xl p-2.5 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="font-bold text-slate-200">{ticket.selection}</span>
+                    </div>
+                    {ticket.odds > 1 && (
+                      <span className="font-mono font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                        @{ticket.odds}
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 {/* 📸 CAPTURA PRINCIPAL DEL TICKET */}
@@ -786,7 +811,7 @@ export default function ComunidadPage() {
   );
 }
 
-{/* 🏆 MODAL DE PUBLICACIÓN MINIMALISTA & ULTRA CLEAN (TWITTER/X STYLE) 🏆 */}
+{/* MODAL DE PUBLICACIÓN MINIMALISTA & ULTRA CLEAN */}
 function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false);
   const [comment, setComment] = useState('');
@@ -923,7 +948,6 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           
-          {/* 1. Mensaje de Texto (Estilo Twitter) */}
           <textarea
             rows={2}
             value={comment}
@@ -932,7 +956,6 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
             className="w-full bg-[#06080e] border border-slate-800/90 rounded-xl p-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none text-xs font-medium"
           />
 
-          {/* 2. Zona de Carga de Captura (Minimalista) */}
           <div className="border border-dashed border-slate-700/80 hover:border-emerald-500/60 rounded-xl p-3 bg-[#06080e] text-center cursor-pointer transition relative group">
             <input
               type="file"
@@ -960,7 +983,6 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
             )}
           </div>
 
-          {/* 3. Etiqueta / Tag Rápida (1 sola fila limpia) */}
           <div className="space-y-1.5 pt-1">
             <span className="text-[10px] font-mono text-slate-400 block font-semibold uppercase">Etiqueta opcional</span>
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
@@ -981,7 +1003,6 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
             </div>
           </div>
 
-          {/* 4. Botón de Publicar */}
           <div className="pt-2">
             <button
               type="submit"

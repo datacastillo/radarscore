@@ -9,7 +9,9 @@ import {
   User, 
   ShieldAlert, 
   PlusCircle,
-  ArrowRight
+  ArrowRight,
+  Trophy,
+  LogOut
 } from 'lucide-react';
 import AuthModal from '@/components/AuthModal';
 import CreatePickModal from '@/components/CreatePickModal';
@@ -20,18 +22,19 @@ export default function Navbar() {
   const router = useRouter();
   const isHomePage = pathname === '/';
   
-  // Estado para el modal de autenticación
+  // Estado para modales
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-
-  // Estado para el modal de publicar pick
   const [isCreatePickOpen, setIsCreatePickOpen] = useState(false);
 
-  // Estado para el rol del usuario ('admin', 'user', etc.)
+  // Estados de usuario y rol
+  const [user, setUser] = useState<any>(null);
   const [userRol, setUserRol] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserRol = async () => {
+    const fetchUserAndRol = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      setUser(user || null);
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -45,14 +48,17 @@ export default function Navbar() {
       }
     };
 
-    fetchUserRol();
+    fetchUserAndRol();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      if (currentUser) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('rol')
-          .eq('id', session.user.id)
+          .eq('id', currentUser.id)
           .single();
         setUserRol(profile?.rol || null);
       } else {
@@ -69,11 +75,23 @@ export default function Navbar() {
     router.push('/comunidad');
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserRol(null);
+    router.push('/');
+  };
+
   const navItems = [
     {
       label: 'Comunidad',
       href: '/comunidad',
       icon: LayoutGrid,
+    },
+    {
+      label: 'Ranking',
+      href: '/ranking',
+      icon: Trophy,
     },
     {
       label: 'Mi Perfil',
@@ -109,14 +127,34 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsAuthOpen(true)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
-              >
-                <span>Entrar a la App</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/comunidad"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
+                  >
+                    <span>Ir a la Comunidad</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    title="Cerrar Sesión"
+                    className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 p-2 rounded-xl transition cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthOpen(true)}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
+                >
+                  <span>Entrar a la App</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
           </div>
@@ -173,7 +211,7 @@ export default function Navbar() {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setIsCreatePickOpen(true)}
@@ -182,6 +220,17 @@ export default function Navbar() {
               <PlusCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Publicar Pick</span>
             </button>
+
+            {user && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Cerrar Sesión"
+                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 p-2 rounded-xl transition active:scale-95 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
         </div>

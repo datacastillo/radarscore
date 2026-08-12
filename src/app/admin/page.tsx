@@ -111,12 +111,12 @@ export default function AdminPanelPage() {
       .from('tickets')
       .select('*')
       .eq('user_id', userId)
-      .in('status', ['WON', 'LOST']);
+      .in('status', ['WIN', 'LOSS', 'WON', 'LOST']);
 
     if (!userTickets) return;
 
     const totalPicks = userTickets.length;
-    const wonPicks = userTickets.filter(t => t.status === 'WON').length;
+    const wonPicks = userTickets.filter(t => t.status === 'WIN' || t.status === 'WON').length;
     const winRate = totalPicks > 0 ? (wonPicks / totalPicks) * 100 : 0;
 
     // Solo tickets elegibles (odds < 10.0) para Yield
@@ -127,7 +127,7 @@ export default function AdminPanelPage() {
     eligibleTickets.forEach(t => {
       const stake = t.stake || 100;
       totalStaked += stake;
-      if (t.status === 'WON') {
+      if (t.status === 'WIN' || t.status === 'WON') {
         totalReturned += t.potential_payout || (stake * t.odds);
       }
     });
@@ -146,14 +146,17 @@ export default function AdminPanelPage() {
       .eq('id', userId);
   };
 
-  const handleResolve = async (ticket: TicketAdmin, newStatus: 'WON' | 'LOST') => {
+  const handleResolve = async (ticket: TicketAdmin, newStatus: 'WIN' | 'LOSS' | 'WON' | 'LOST') => {
     setResolvingId(ticket.id);
     try {
+      // Normalizar a WIN / LOSS para compatibilidad estricta con la restricción SQL
+      const statusToSave = (newStatus === 'WIN' || newStatus === 'WON') ? 'WIN' : 'LOSS';
+
       // 1. Actualizar el estado del ticket en Supabase
       const { error: updateError } = await supabase
         .from('tickets')
         .update({ 
-          status: newStatus,
+          status: statusToSave,
           resolved_at: new Date().toISOString()
         })
         .eq('id', ticket.id);
@@ -334,7 +337,7 @@ export default function AdminPanelPage() {
                   <div className="pt-3 flex gap-2 border-t border-gray-800/80 mt-2">
                     <button
                       disabled={resolvingId === ticket.id}
-                      onClick={() => handleResolve(ticket, 'WON')}
+                      onClick={() => handleResolve(ticket, 'WIN')}
                       className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       {resolvingId === ticket.id ? (
@@ -349,7 +352,7 @@ export default function AdminPanelPage() {
 
                     <button
                       disabled={resolvingId === ticket.id}
-                      onClick={() => handleResolve(ticket, 'LOST')}
+                      onClick={() => handleResolve(ticket, 'LOSS')}
                       className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       {resolvingId === ticket.id ? (

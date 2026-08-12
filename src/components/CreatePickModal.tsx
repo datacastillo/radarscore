@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   Camera,
   Upload,
-  Rocket
+  Rocket,
+  ShieldCheck
 } from 'lucide-react';
 
 interface CreatePickModalProps {
@@ -50,7 +51,7 @@ function parseOddsInput(input: string): { decimal: number; isDreamer: boolean } 
   } else {
     const val = parseFloat(clean.replace(',', '.')) || 0;
     if (val > 20) {
-      // Si escribieron ej. 250 sin el +, se asume momio americano positivo +250
+      // Se asume momio americano positivo sin signo (+250)
       dec = (val / 100) + 1;
     } else {
       // Cuota Decimal normal (ej. 1.85)
@@ -171,7 +172,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
         }
       }
 
-      // INSERTAR TICKET EN SUPABASE (CON IS_DREAMER INCLUIDO)
+      // INSERTAR TICKET EN SUPABASE
       const { error } = await supabase.from('tickets').insert([
         {
           user_id: user.id,
@@ -184,7 +185,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
           comment: comment.trim() || null,
           image_url: imageUrl,
           status: 'PENDING',
-          is_dreamer: isDreamer // 🟢 CLAVE PASO 2: Excluye automát. de tabla porcentual si >= 10.0
+          is_dreamer: isDreamer
         }
       ]);
 
@@ -219,7 +220,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-white tracking-tight">Publicar Pronóstico</h2>
-              <p className="text-[11px] text-gray-400 font-medium">Comparte tu visión o captura con la comunidad</p>
+              <p className="text-[11px] text-gray-400 font-medium">Comparte tu visión o boleto real con la comunidad</p>
             </div>
           </div>
 
@@ -230,6 +231,15 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* 🛡️ BANNER DE TRANSPARENCIA Y JUEGO LIMPIO */}
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-3 flex items-start gap-2.5 text-[11px] text-amber-200/90 leading-relaxed relative z-10">
+          <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-extrabold text-amber-300 block mb-0.5">Política de Juego Limpio & Transparencia</span>
+            La cuota y selección ingresadas deben coincidir exactamente con las de tu boleto. Picks alterados o que no coincidan con la captura adjunta serán anulados por la administración.
+          </div>
         </div>
 
         {/* Formulario */}
@@ -299,7 +309,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
 
             <div className="space-y-1.5">
               <label className="text-gray-300 font-bold flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-emerald-400" /> Tu Selección
+                <Target className="w-3.5 h-3.5 text-emerald-400" /> Tu Selección (Debe coincidir con el ticket)
               </label>
               <input
                 type="text"
@@ -317,7 +327,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
             <div className="space-y-1.5">
               <label className="text-gray-300 font-bold flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Momio / Cuota
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Momio Real del Ticket
                 </span>
                 {isDreamer && (
                   <span className="text-[9px] text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-0.5">
@@ -377,7 +387,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
           {/* Carga Opcional de Captura / Ticket */}
           <div className="space-y-1.5">
             <label className="text-gray-300 font-bold flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-emerald-400" /> Adjuntar Captura de Pantalla (Opcional)
+              <Camera className="w-3.5 h-3.5 text-emerald-400" /> Adjuntar Captura del Boleto (Recomendado)
             </label>
             <div className="border border-dashed border-gray-800 hover:border-emerald-500/50 rounded-2xl p-2.5 bg-[#161C26] text-center cursor-pointer transition relative">
               <input
@@ -400,7 +410,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
               ) : (
                 <div className="flex items-center justify-center gap-2 py-1.5 text-gray-400">
                   <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-xs font-medium text-gray-300">Haz clic para subir la captura del boleto</span>
+                  <span className="text-xs font-medium text-gray-300">Sube aquí la imagen legible de tu apuesta</span>
                 </div>
               )}
             </div>

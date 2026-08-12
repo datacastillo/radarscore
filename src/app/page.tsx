@@ -22,8 +22,7 @@ import {
   Check,
   Lock,
   Bell,
-  Cpu,
-  LogOut
+  Cpu
 } from 'lucide-react';
 
 export default function DefinitiveHomePage() {
@@ -89,7 +88,7 @@ export default function DefinitiveHomePage() {
       clearInterval(progressInterval);
       clearInterval(phraseInterval);
     };
-  }, []);
+  }, [phrases.length]);
 
   const handleCopy = () => {
     setCopied(true);
@@ -99,13 +98,6 @@ export default function DefinitiveHomePage() {
   // Redirección al autenticarse exitosamente
   const handleAuthSuccess = () => {
     router.push('/comunidad');
-  };
-
-  // Función para cerrar sesión
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    router.refresh();
   };
 
   return (
@@ -221,7 +213,7 @@ export default function DefinitiveHomePage() {
           </p>
         </div>
 
-        {/* Botones de Acción Inteligentes según Sesión */}
+        {/* BOTONES PRINCIPALES LIMPIOS */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           <button
             onClick={() => user ? router.push('/comunidad') : setIsAuthOpen(true)}
@@ -239,18 +231,6 @@ export default function DefinitiveHomePage() {
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <span>{user ? 'Ver Mi Perfil' : 'Mi Perfil de Tipster'}</span>
           </button>
-
-          {/* Botón rápido de Salir si hay sesión iniciada */}
-          {user && (
-            <button
-              onClick={handleLogout}
-              className="w-full sm:w-auto bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-5 py-4 rounded-2xl transition-all duration-300 font-bold flex items-center justify-center gap-2 text-sm cursor-pointer"
-              title="Cerrar Sesión"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Salir</span>
-            </button>
-          )}
         </div>
 
         {/* CINTA DE SEÑALES EN VIVO (MARQUEE TICKER) */}
