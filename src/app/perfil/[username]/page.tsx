@@ -20,7 +20,9 @@ import {
   Users,
   Loader2,
   Edit3,
-  X
+  X,
+  Rocket,
+  DollarSign
 } from 'lucide-react';
 
 interface Profile {
@@ -32,6 +34,7 @@ interface Profile {
   yield_rate: number;
   win_rate: number;
   total_picks: number;
+  total_profit?: number;
   bio?: string;
   created_at: string;
 }
@@ -45,7 +48,8 @@ interface Ticket {
   stake: number;
   potential_payout?: number;
   comment?: string;
-  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost';
+  is_dreamer?: boolean;
+  status: 'PENDING' | 'WON' | 'LOST' | 'WIN' | 'LOSS' | string;
   created_at: string;
 }
 
@@ -243,14 +247,54 @@ export default function PublicProfilePage() {
     );
   }
 
-  const wonTickets = tickets.filter(t => t.status?.toUpperCase() === 'WIN').length;
-  const lostTickets = tickets.filter(t => t.status?.toUpperCase() === 'LOSS').length;
-  const pendingTickets = tickets.filter(t => t.status?.toUpperCase() === 'PENDING').length;
+  // 🧠 CÁLCULOS PÚBLICOS ROBUSTOS (Soporte WON / WIN / LOST / LOSS)
+  const isPending = (st: string) => st?.toUpperCase() === 'PENDING';
+  const isWon = (st: string) => st?.toUpperCase() === 'WON' || st?.toUpperCase() === 'WIN';
+  const isLost = (st: string) => st?.toUpperCase() === 'LOST' || st?.toUpperCase() === 'LOSS';
+
+  const historyTickets = tickets.filter(t => !isPending(t.status));
+  const wonTickets = tickets.filter(t => isWon(t.status)).length;
+  const lostTickets = tickets.filter(t => isLost(t.status)).length;
+
+  // Exclusión de Parlays Soñadores en Yield / Win Rate
+  const eligibleYieldTickets = historyTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
+  
+  let totalStakedYield = 0;
+  let totalReturnedYield = 0;
+
+  eligibleYieldTickets.forEach(t => {
+    const stake = t.stake || 100;
+    totalStakedYield += stake;
+    if (isWon(t.status)) {
+      totalReturnedYield += t.potential_payout || (stake * t.odds);
+    }
+  });
+
+  const calculatedProfitYield = totalReturnedYield - totalStakedYield;
+  const calculatedYieldRate = totalStakedYield > 0 ? (calculatedProfitYield / totalStakedYield) * 100 : 0;
+  
+  const eligibleWonCount = eligibleYieldTickets.filter(t => isWon(t.status)).length;
+  const calculatedWinRate = eligibleYieldTickets.length > 0 ? (eligibleWonCount / eligibleYieldTickets.length) * 100 : 0;
+
+  const displayYield = eligibleYieldTickets.length > 0 ? calculatedYieldRate.toFixed(2) : (profile.yield_rate || 0);
+  const displayWinRate = eligibleYieldTickets.length > 0 ? calculatedWinRate.toFixed(1) : (profile.win_rate || 0);
+
+  // Ganancia Neta Total
+  let globalNetProfit = 0;
+  historyTickets.forEach(t => {
+    const stake = t.stake || 100;
+    if (isWon(t.status)) {
+      globalNetProfit += (t.potential_payout || (stake * t.odds)) - stake;
+    } else if (isLost(t.status)) {
+      globalNetProfit -= stake;
+    }
+  });
+
+  const displayTotalProfit = historyTickets.length > 0 ? globalNetProfit.toFixed(2) : (profile.total_profit || 0);
 
   const filteredTickets = tickets.filter(t => {
-    const s = t.status?.toUpperCase();
-    if (activeTab === 'wins') return s === 'WIN';
-    if (activeTab === 'losses') return s === 'LOSS';
+    if (activeTab === 'wins') return isWon(t.status);
+    if (activeTab === 'losses') return isLost(t.status);
     return true;
   });
 
@@ -344,14 +388,14 @@ export default function PublicProfilePage() {
             </div>
           </div>
 
-          {/* Barra de Estadísticas */}
+          {/* Barra de Estadísticas Públicas */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-gray-800/80">
             <div className="bg-[#0B0E14] border border-gray-800/80 rounded-2xl p-3.5 text-center">
               <div className="flex items-center justify-center gap-1 text-[11px] text-gray-400 font-bold mb-1">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Yield
               </div>
-              <span className={`text-lg font-black ${profile.yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                {profile.yield_rate > 0 ? `+${profile.yield_rate}` : profile.yield_rate}%
+              <span className={`text-lg font-black ${Number(displayYield) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                {Number(displayYield) > 0 ? `+${displayYield}` : displayYield}%
               </span>
             </div>
 
@@ -360,25 +404,25 @@ export default function PublicProfilePage() {
                 <Target className="w-3.5 h-3.5 text-amber-400" /> Win Rate
               </div>
               <span className="text-lg font-black text-amber-400">
-                {profile.win_rate || 0}%
+                {displayWinRate}%
               </span>
             </div>
 
             <div className="bg-[#0B0E14] border border-gray-800/80 rounded-2xl p-3.5 text-center">
               <div className="flex items-center justify-center gap-1 text-[11px] text-gray-400 font-bold mb-1">
-                <BarChart2 className="w-3.5 h-3.5 text-cyan-400" /> Total Picks
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Ganancia Neta
               </div>
-              <span className="text-lg font-black text-cyan-400">
-                {profile.total_picks || tickets.length}
+              <span className={`text-lg font-black ${Number(displayTotalProfit) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                ${displayTotalProfit} MXN
               </span>
             </div>
 
             <div className="bg-[#0B0E14] border border-gray-800/80 rounded-2xl p-3.5 text-center">
               <div className="flex items-center justify-center gap-1 text-[11px] text-gray-400 font-bold mb-1">
-                <Award className="w-3.5 h-3.5 text-emerald-400" /> Récord (G-P-E)
+                <Award className="w-3.5 h-3.5 text-cyan-400" /> Récord (G-P)
               </div>
               <span className="text-lg font-black text-white">
-                <span className="text-emerald-400">{wonTickets}</span> - <span className="text-rose-500">{lostTickets}</span> - <span className="text-amber-400">{pendingTickets}</span>
+                <span className="text-emerald-400">{wonTickets}</span> - <span className="text-rose-500">{lostTickets}</span>
               </span>
             </div>
           </div>
@@ -432,7 +476,11 @@ export default function PublicProfilePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredTickets.map(ticket => {
-                const status = ticket.status?.toUpperCase();
+                const win = isWon(ticket.status);
+                const lost = isLost(ticket.status);
+                const pending = isPending(ticket.status);
+                const isDreamer = ticket.is_dreamer || ticket.odds >= 10.0;
+
                 return (
                   <div
                     key={ticket.id}
@@ -440,25 +488,32 @@ export default function PublicProfilePage() {
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                          {ticket.league}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {ticket.league || 'Liga General'}
+                          </span>
+                          {isDreamer && (
+                            <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                              <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                            </span>
+                          )}
+                        </div>
                         <h4 className="font-bold text-white text-sm mt-1">
                           {ticket.match_title}
                         </h4>
                       </div>
 
-                      {status === 'WIN' && (
+                      {win && (
                         <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> GANADO
                         </span>
                       )}
-                      {status === 'LOSS' && (
+                      {lost && (
                         <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                           <XCircle className="w-3 h-3" /> PERDIDO
                         </span>
                       )}
-                      {status === 'PENDING' && (
+                      {pending && (
                         <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                           <Clock className="w-3 h-3" /> En Juego
                         </span>
@@ -476,7 +531,7 @@ export default function PublicProfilePage() {
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-gray-500 block">Stake:</span>
-                        <span className="font-bold text-white">${ticket.stake}</span>
+                        <span className="font-bold text-white">${ticket.stake} MXN</span>
                       </div>
                     </div>
 

@@ -21,7 +21,8 @@ import {
   XCircle, 
   BarChart2,
   DollarSign,
-  LogOut // 👈 Importado LogOut
+  LogOut,
+  Rocket
 } from 'lucide-react';
 
 interface Profile {
@@ -46,12 +47,14 @@ interface Ticket {
   stake: number;
   potential_payout?: number;
   comment?: string;
-  status: 'PENDING' | 'WIN' | 'LOSS' | 'pending' | 'won' | 'lost';
+  image_url?: string;
+  is_dreamer?: boolean;
+  status: 'PENDING' | 'WON' | 'LOST' | 'WIN' | 'LOSS' | string;
   created_at: string;
 }
 
 export default function MiPerfilPage() {
-  const router = useRouter(); // 👈 Inicializado useRouter
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -163,7 +166,6 @@ export default function MiPerfilPage() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // 🔴 FUNCIÓN CERRAR SESIÓN
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
@@ -206,10 +208,52 @@ export default function MiPerfilPage() {
     );
   }
 
-  const pendingTickets = tickets.filter(t => t.status?.toUpperCase() === 'PENDING');
-  const historyTickets = tickets.filter(t => t.status?.toUpperCase() !== 'PENDING');
-  const wonTickets = tickets.filter(t => t.status?.toUpperCase() === 'WIN').length;
-  const lostTickets = tickets.filter(t => t.status?.toUpperCase() === 'LOSS').length;
+  // 🧠 CÁLCULO DE LISTAS Y ESTADÍSTICAS ROBUSTAS (WON / WIN / LOST / LOSS)
+  const isPending = (st: string) => st?.toUpperCase() === 'PENDING';
+  const isWon = (st: string) => st?.toUpperCase() === 'WON' || st?.toUpperCase() === 'WIN';
+  const isLost = (st: string) => st?.toUpperCase() === 'LOST' || st?.toUpperCase() === 'LOSS';
+
+  const pendingTickets = tickets.filter(t => isPending(t.status));
+  const historyTickets = tickets.filter(t => !isPending(t.status));
+  const wonTickets = tickets.filter(t => isWon(t.status)).length;
+  const lostTickets = tickets.filter(t => isLost(t.status)).length;
+
+  // 🎯 REGLA PASO 4: Excluimos Parlays Soñadores (odds >= 10.0 o is_dreamer) del Yield %
+  const eligibleYieldTickets = historyTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
+  
+  let totalStakedYield = 0;
+  let totalReturnedYield = 0;
+
+  eligibleYieldTickets.forEach(t => {
+    const stake = t.stake || 100;
+    totalStakedYield += stake;
+    if (isWon(t.status)) {
+      totalReturnedYield += t.potential_payout || (stake * t.odds);
+    }
+  });
+
+  const calculatedProfitYield = totalReturnedYield - totalStakedYield;
+  const calculatedYieldRate = totalStakedYield > 0 ? (calculatedProfitYield / totalStakedYield) * 100 : 0;
+  
+  const eligibleWonCount = eligibleYieldTickets.filter(t => isWon(t.status)).length;
+  const calculatedWinRate = eligibleYieldTickets.length > 0 ? (eligibleWonCount / eligibleYieldTickets.length) * 100 : 0;
+
+  // Mostramos el valor calculado si existe actividad, de lo contrario el de Supabase
+  const displayYield = eligibleYieldTickets.length > 0 ? calculatedYieldRate.toFixed(2) : (profile.yield_rate || 0);
+  const displayWinRate = eligibleYieldTickets.length > 0 ? calculatedWinRate.toFixed(1) : (profile.win_rate || 0);
+
+  // Ganancia Total Neta incluyendo Soñadores
+  let globalNetProfit = 0;
+  historyTickets.forEach(t => {
+    const stake = t.stake || 100;
+    if (isWon(t.status)) {
+      globalNetProfit += (t.potential_payout || (stake * t.odds)) - stake;
+    } else if (isLost(t.status)) {
+      globalNetProfit -= stake;
+    }
+  });
+
+  const displayTotalProfit = historyTickets.length > 0 ? globalNetProfit.toFixed(2) : (profile.total_profit || 0);
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white py-8 px-4 sm:px-6 lg:px-8">
@@ -354,7 +398,6 @@ export default function MiPerfilPage() {
                   )}
                 </button>
 
-                {/* 🔴 NUEVO: Botón Cerrar Sesión */}
                 <button
                   onClick={handleLogout}
                   className="flex-1 sm:flex-initial bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
@@ -367,14 +410,14 @@ export default function MiPerfilPage() {
             </div>
           )}
 
-          {/* Grid de Métricas Oficiales */}
+          {/* Grid de Métricas Oficiales (Yield sin Soñadores) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-gray-800/80">
             <div className="bg-[#0B0E14] border border-gray-800/80 p-3.5 rounded-2xl text-center space-y-0.5">
               <span className="text-[11px] text-gray-400 font-bold flex items-center justify-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Yield %
               </span>
-              <span className={`text-xl font-black ${profile.yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                {profile.yield_rate > 0 ? `+${profile.yield_rate}` : profile.yield_rate}%
+              <span className={`text-xl font-black ${Number(displayYield) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                {Number(displayYield) > 0 ? `+${displayYield}` : displayYield}%
               </span>
             </div>
 
@@ -383,7 +426,7 @@ export default function MiPerfilPage() {
                 <Target className="w-3.5 h-3.5 text-amber-400" /> Win Rate
               </span>
               <span className="text-xl font-black text-amber-400">
-                {profile.win_rate || 0}%
+                {displayWinRate}%
               </span>
             </div>
 
@@ -391,8 +434,8 @@ export default function MiPerfilPage() {
               <span className="text-[11px] text-gray-400 font-bold flex items-center justify-center gap-1">
                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Ganancia Neta
               </span>
-              <span className={`text-xl font-black ${(profile.total_profit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                ${profile.total_profit || 0} MXN
+              <span className={`text-xl font-black ${Number(displayTotalProfit) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                ${displayTotalProfit} MXN
               </span>
             </div>
 
@@ -443,36 +486,47 @@ export default function MiPerfilPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendingTickets.map(ticket => (
-                  <div key={ticket.id} className="bg-[#141A23] border border-gray-800 rounded-2xl p-5 space-y-3 shadow-lg">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                          {ticket.league}
-                        </span>
-                        <h3 className="font-bold text-white text-sm mt-1">{ticket.match_title}</h3>
-                      </div>
-                      <span className="text-amber-400 font-extrabold text-xs">Cuota @{ticket.odds}</span>
-                    </div>
+                {pendingTickets.map(ticket => {
+                  const isDreamer = ticket.is_dreamer || ticket.odds >= 10.0;
 
-                    <div className="bg-[#0B0E14] p-3 rounded-xl flex justify-between items-center text-xs border border-gray-800/60">
-                      <div>
-                        <span className="text-gray-500 text-[10px] block">Selección:</span>
-                        <span className="font-bold text-emerald-400">{ticket.selection}</span>
+                  return (
+                    <div key={ticket.id} className="bg-[#141A23] border border-gray-800 rounded-2xl p-5 space-y-3 shadow-lg relative overflow-hidden">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                              {ticket.league || 'Liga General'}
+                            </span>
+                            {isDreamer && (
+                              <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="font-bold text-white text-sm mt-1">{ticket.match_title}</h3>
+                        </div>
+                        <span className="text-amber-400 font-extrabold text-xs">Cuota @{ticket.odds}</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-gray-500 text-[10px] block">Monto:</span>
-                        <span className="font-bold text-white">${ticket.stake} MXN</span>
-                      </div>
-                    </div>
 
-                    {ticket.comment && (
-                      <p className="text-[11px] text-gray-400 italic bg-[#0B0E14]/40 p-2 rounded-lg border border-gray-800/40">
-                        "{ticket.comment}"
-                      </p>
-                    )}
-                  </div>
-                ))}
+                      <div className="bg-[#0B0E14] p-3 rounded-xl flex justify-between items-center text-xs border border-gray-800/60">
+                        <div>
+                          <span className="text-gray-500 text-[10px] block">Selección:</span>
+                          <span className="font-bold text-emerald-400">{ticket.selection}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-gray-500 text-[10px] block">Monto:</span>
+                          <span className="font-bold text-white">${ticket.stake} MXN</span>
+                        </div>
+                      </div>
+
+                      {ticket.comment && (
+                        <p className="text-[11px] text-gray-400 italic bg-[#0B0E14]/40 p-2 rounded-lg border border-gray-800/40">
+                          "{ticket.comment}"
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )
           ) : (
@@ -483,12 +537,24 @@ export default function MiPerfilPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {historyTickets.map(ticket => {
-                  const isWin = ticket.status?.toUpperCase() === 'WIN';
+                  const win = isWon(ticket.status);
+                  const isDreamer = ticket.is_dreamer || ticket.odds >= 10.0;
+                  const profitVal = win 
+                    ? ((ticket.potential_payout || (ticket.stake * ticket.odds)) - ticket.stake) 
+                    : ticket.stake;
+
                   return (
                     <div key={ticket.id} className="bg-[#141A23] border border-gray-800 rounded-2xl p-4 space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-white font-bold">{ticket.match_title}</span>
-                        {isWin ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-white font-bold">{ticket.match_title}</span>
+                          {isDreamer && (
+                            <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                              <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                            </span>
+                          )}
+                        </div>
+                        {win ? (
                           <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> GANADO
                           </span>
@@ -501,8 +567,8 @@ export default function MiPerfilPage() {
 
                       <div className="flex justify-between text-xs bg-[#0B0E14] p-2.5 rounded-xl border border-gray-800/60">
                         <span className="text-gray-300 font-semibold">{ticket.selection} (@{ticket.odds})</span>
-                        <span className={isWin ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>
-                          {isWin ? `+$${((ticket.stake * ticket.odds) - ticket.stake).toFixed(2)} MXN` : `-$${ticket.stake} MXN`}
+                        <span className={win ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>
+                          {win ? `+$${profitVal.toFixed(2)} MXN` : `-$${profitVal.toFixed(2)} MXN`}
                         </span>
                       </div>
                     </div>
