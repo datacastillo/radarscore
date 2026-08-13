@@ -5,277 +5,480 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   Trophy, 
-  Medal, 
-  Award, 
   TrendingUp, 
+  Flame, 
   Target, 
-  ShieldCheck, 
+  Crown, 
   Search, 
-  Sparkles, 
-  Loader2,
-  DollarSign,
-  ArrowUpRight,
-  Zap
+  Loader2, 
+  Medal,
+  Award,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  BarChart3,
+  User
 } from 'lucide-react';
 
-interface Tipster {
+interface TipsterProfile {
   id: string;
   username: string;
-  full_name: string;
-  avatar_url: string;
-  is_verified: boolean;
-  yield_rate: number;
-  win_rate: number;
-  total_profit: number;
+  full_name: string | null;
+  avatar_url: string | null;
   total_picks: number;
+  win_rate: number;
+  yield_rate: number;
+  total_profit: number;
+  streak?: number;
+  rol?: string;
 }
 
+type SortOption = 'yield_rate' | 'win_rate' | 'total_profit' | 'total_picks';
+
 export default function RankingPage() {
-  const [tipsters, setTipsters] = useState<Tipster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profiles, setProfiles] = useState<TipsterProfile[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>('yield_rate');
   const [searchQuery, setSearchQuery] = useState('');
+  const [minPicksOnly, setMinPicksOnly] = useState(true); // Filtro para requerir mínimo 3 picks para el ranking oficial
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+  }, [sortBy]);
 
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
+      // Consultar perfiles ordenados por la métrica seleccionada
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, avatar_url, is_verified, yield_rate, win_rate, total_profit, total_picks')
-        .order('yield_rate', { ascending: false })
-        .limit(50);
+        .select('*')
+        .gt('total_picks', 0) // Solo usuarios con al menos 1 pick publicado
+        .order(sortBy, { ascending: false });
 
       if (error) throw error;
-      setTipsters(data || []);
+      setProfiles(data || []);
     } catch (err) {
-      console.error('Error al cargar la tabla de líderes:', err);
+      console.error('Error al cargar ranking:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTipsters = tipsters.filter(t => 
-    (t.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filtrado por término de búsqueda y filtro de cualificación (ej: min 3 picks)
+  const filteredProfiles = profiles.filter(p => {
+    const matchesSearch = 
+      p.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (minPicksOnly) {
+      return matchesSearch && (p.total_picks || 0) >= 3;
+    }
+    return matchesSearch;
+  });
 
-  const top1 = filteredTipsters[0];
-  const top2 = filteredTipsters[1];
-  const top3 = filteredTipsters[2];
-  const restTipsters = filteredTipsters.slice(3);
+  const top3 = filteredProfiles.slice(0, 3);
+  const remainingTipsters = filteredProfiles.slice(3);
+
+  const getRankBadge = (index: number) => {
+    switch (index) {
+      case 0:
+        return { color: 'from-amber-400 to-yellow-600', text: 'text-amber-400', border: 'border-amber-500/40', icon: Trophy, label: '1er Lugar' };
+      case 1:
+        return { color: 'from-slate-300 to-slate-500', text: 'text-slate-300', border: 'border-slate-400/40', icon: Medal, label: '2do Lugar' };
+      case 2:
+        return { color: 'from-amber-700 to-amber-900', text: 'text-amber-600', border: 'border-amber-700/40', icon: Award, label: '3er Lugar' };
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 font-sans py-8 px-4 sm:px-6 lg:px-8 selection:bg-emerald-500 selection:text-black">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* ENCABEZADO */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-400 text-xs font-mono font-bold">
-            <Trophy className="w-3.5 h-3.5" /> TABLA DE LÍDERES OFICIAL
+    <div className="min-h-screen bg-[#07090e] text-slate-100 py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-emerald-500 selection:text-black">
+      <div className="max-w-6xl mx-auto space-y-8">
+
+        {/* Encabezado del Leaderboard */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-[#0c0f17] via-[#0f1422] to-[#0c0f17] border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-emerald-400 text-xs font-bold font-mono">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>LEADERBOARD OFICIAL DE RADAR SCORE</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Ranking de Tipsters
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-xl leading-relaxed">
+                Compite con los mejores analistas de la comunidad. Las métricas de <strong className="text-emerald-400">Yield %</strong> y <strong className="text-emerald-400">Win Rate %</strong> se recalculan automáticamente con cada ticket verificado.
+              </p>
+            </div>
+
+            {/* Selector de Criterio de Ordenamiento */}
+            <div className="bg-[#06080e] p-1.5 rounded-2xl border border-slate-800 flex flex-wrap gap-1 shrink-0 w-full md:w-auto">
+              <button
+                onClick={() => setSortBy('yield_rate')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  sortBy === 'yield_rate'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Yield %</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy('win_rate')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  sortBy === 'win_rate'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Target className="w-3.5 h-3.5" />
+                <span>Win Rate %</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy('total_profit')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  sortBy === 'total_profit'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Profit MXN</span>
+              </button>
+
+              <button
+                onClick={() => setSortBy('total_picks')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  sortBy === 'total_picks'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Total Picks</span>
+              </button>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Top Tipsters de <span className="text-emerald-400">Radar Score</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-            Liderazgo basado exclusivamente en <strong>Yield % justo</strong> (sin la distorsión de Parlays Soñadores) y transparencia total.
-          </p>
         </div>
 
-        {/* BUSCADOR */}
-        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 max-w-md mx-auto relative">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar tipster por @nombre..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent pl-9 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none font-medium"
-          />
+        {/* Buscador y Filtro de Cualificación */}
+        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar tipster por usuario o nombre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#06080e] border border-slate-800 focus:border-emerald-500/50 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition font-medium"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer self-end sm:self-auto select-none">
+            <input
+              type="checkbox"
+              checked={minPicksOnly}
+              onChange={(e) => setMinPicksOnly(e.target.checked)}
+              className="rounded bg-[#06080e] border-slate-800 text-emerald-500 focus:ring-0 cursor-pointer w-4 h-4"
+            />
+            <span>Mostrar solo tipsters con <strong className="text-slate-200">3+ picks</strong> verificado(s)</span>
+          </label>
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 space-y-3">
+          <div className="flex flex-col items-center justify-center py-24 space-y-3 text-slate-400 text-xs">
             <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-            <span className="text-xs text-slate-400 font-mono">Calculando posicionales del Ranking...</span>
+            <span>Cargando tabla de clasificación...</span>
           </div>
-        ) : filteredTipsters.length === 0 ? (
-          <div className="bg-[#0c0f17] border border-slate-800 rounded-3xl p-12 text-center text-slate-500 text-xs">
-            No se encontraron tipsters registrados o coincidentes.
+        ) : filteredProfiles.length === 0 ? (
+          <div className="bg-[#0c0f17] border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+            <User className="w-12 h-12 text-slate-600 mx-auto" />
+            <h3 className="text-base font-bold text-slate-300">No hay tipsters para mostrar</h3>
+            <p className="text-xs text-slate-500">Intenta cambiar los filtros de búsqueda o desmarcar el requisito de picks mínimos.</p>
           </div>
         ) : (
-          <>
-            {/* PODIO (TOP 3) - Solo se muestra si no hay búsqueda activa o si hay al menos 3 resultados */}
-            {!searchQuery && tipsters.length >= 3 && (
-              <div className="grid grid-cols-3 gap-3 sm:gap-6 items-end pt-6 pb-2">
-                
-                {/* 🥈 SEGUNDO LUGAR */}
-                {top2 && (
-                  <Link 
-                    href={`/perfil/${top2.username}`}
-                    className="bg-[#0c0f17] border border-slate-800 hover:border-slate-700 rounded-3xl p-4 sm:p-5 text-center space-y-3 relative group transition shadow-lg"
-                  >
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-700 text-slate-200 border border-slate-600 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
-                      <Medal className="w-3 h-3 text-slate-300" /> #2
-                    </div>
-                    
-                    <img 
-                      src={top2.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                      alt={top2.username}
-                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ring-2 ring-slate-400/40"
-                    />
+          <div className="space-y-8">
 
-                    <div>
-                      <h3 className="font-bold text-white text-xs sm:text-sm truncate">@{top2.username}</h3>
-                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                        {top2.yield_rate > 0 ? `+${top2.yield_rate}` : top2.yield_rate}% Yield
-                      </span>
+            {/* SECCIÓN PODIO: TOP 3 TIPSTERS */}
+            {top3.length > 0 && !searchQuery && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 items-end">
+                {/* 2do Lugar (Izquierda en desktop) */}
+                {top3[1] && (
+                  <div className="order-2 md:order-1 bg-[#0c0f17] border border-slate-800/90 hover:border-slate-700 transition rounded-3xl p-5 space-y-4 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-3 right-3 bg-slate-400/10 border border-slate-400/30 text-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono flex items-center gap-1">
+                      <Medal className="w-3 h-3 text-slate-300" /> #2 LUGAR
                     </div>
 
-                    <div className="bg-[#06080e] p-2 rounded-xl text-[10px] text-slate-400 flex justify-around font-mono">
-                      <span>WR: {top2.win_rate || 0}%</span>
-                      <span>Picks: {top2.total_picks || 0}</span>
-                    </div>
-                  </Link>
-                )}
-
-                {/* 🥇 PRIMER LUGAR (DESTACADO) */}
-                {top1 && (
-                  <Link 
-                    href={`/perfil/${top1.username}`}
-                    className="bg-gradient-to-b from-[#141b26] to-[#0c0f17] border-2 border-amber-500/40 hover:border-amber-500/70 rounded-3xl p-5 sm:p-6 text-center space-y-3 relative group transition shadow-[0_0_30px_rgba(245,158,11,0.15)] -translate-y-2"
-                  >
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-lg shadow-amber-500/30">
-                      <Trophy className="w-3.5 h-3.5 fill-slate-950" /> #1 LÍDER
-                    </div>
-                    
-                    <img 
-                      src={top1.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                      alt={top1.username}
-                      className="w-18 h-18 sm:w-20 sm:h-20 rounded-full object-cover mx-auto ring-4 ring-amber-500/50 shadow-xl"
-                    />
-
-                    <div>
-                      <div className="flex items-center justify-center gap-1">
-                        <h3 className="font-black text-white text-sm sm:text-base truncate">@{top1.username}</h3>
-                        {top1.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-400" />}
+                    <div className="flex flex-col items-center text-center space-y-3 pt-2">
+                      <div className="relative">
+                        <img 
+                          src={top3[1].avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                          alt={top3[1].username}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-slate-400 shadow-md"
+                        />
                       </div>
-                      <span className="text-xs sm:text-sm text-emerald-400 font-mono font-black block mt-0.5">
-                        {top1.yield_rate > 0 ? `+${top1.yield_rate}` : top1.yield_rate}% Yield
-                      </span>
-                    </div>
-
-                    <div className="bg-[#06080e] p-2.5 rounded-xl text-xs text-slate-300 flex justify-around font-mono border border-slate-800">
                       <div>
-                        <span className="text-[9px] text-slate-500 block">Win Rate</span>
-                        <span className="font-bold text-amber-400">{top1.win_rate || 0}%</span>
-                      </div>
-                      <div className="border-l border-slate-800 pl-3">
-                        <span className="text-[9px] text-slate-500 block">Ganancia</span>
-                        <span className="font-bold text-emerald-400">${top1.total_profit || 0}</span>
+                        <h3 className="text-sm font-black text-white flex items-center gap-1 justify-center">
+                          @{top3[1].username}
+                          {top3[1].rol === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">{top3[1].full_name || 'Tipster Pro'}</p>
                       </div>
                     </div>
-                  </Link>
+
+                    {/* Stats de #2 */}
+                    <div className="grid grid-cols-2 gap-2 bg-[#06080e] p-3 rounded-2xl border border-slate-800 text-center text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block font-mono">YIELD</span>
+                        <span className={`font-black ${top3[1].yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {top3[1].yield_rate > 0 ? `+${top3[1].yield_rate}%` : `${top3[1].yield_rate}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block font-mono">WIN RATE</span>
+                        <span className="font-bold text-white">{top3[1].win_rate}%</span>
+                      </div>
+                    </div>
+
+                    <Link 
+                      href={`/perfil/${top3[1].username}`}
+                      className="bg-slate-800/60 hover:bg-slate-800 text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1"
+                    >
+                      <span>Ver Historial</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 )}
 
-                {/* 🥉 TERCER LUGAR */}
-                {top3 && (
-                  <Link 
-                    href={`/perfil/${top3.username}`}
-                    className="bg-[#0c0f17] border border-slate-800 hover:border-slate-700 rounded-3xl p-4 sm:p-5 text-center space-y-3 relative group transition shadow-lg"
-                  >
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-700 text-amber-100 border border-amber-600 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
-                      <Award className="w-3 h-3 text-amber-300" /> #3
-                    </div>
+                {/* 1er Lugar (Centro - Destacado Oro) */}
+                {top3[0] && (
+                  <div className="order-1 md:order-2 bg-gradient-to-b from-[#141b2d] to-[#0c0f17] border-2 border-amber-500/50 hover:border-amber-400 transition rounded-3xl p-6 space-y-4 shadow-[0_0_30px_rgba(245,158,11,0.15)] relative overflow-hidden md:-translate-y-3">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500" />
                     
-                    <img 
-                      src={top3.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                      alt={top3.username}
-                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover mx-auto ring-2 ring-amber-700/40"
-                    />
-
-                    <div>
-                      <h3 className="font-bold text-white text-xs sm:text-sm truncate">@{top3.username}</h3>
-                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                        {top3.yield_rate > 0 ? `+${top3.yield_rate}` : top3.yield_rate}% Yield
-                      </span>
+                    <div className="absolute top-3 right-3 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-3 py-0.5 rounded-full text-[10px] font-black font-mono flex items-center gap-1 shadow-sm">
+                      <Crown className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> #1 LIDER
                     </div>
 
-                    <div className="bg-[#06080e] p-2 rounded-xl text-[10px] text-slate-400 flex justify-around font-mono">
-                      <span>WR: {top3.win_rate || 0}%</span>
-                      <span>Picks: {top3.total_picks || 0}</span>
+                    <div className="flex flex-col items-center text-center space-y-3 pt-2">
+                      <div className="relative">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <Crown className="w-6 h-6 text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+                        </div>
+                        <img 
+                          src={top3[0].avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                          alt={top3[0].username}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-amber-400 shadow-xl mt-2"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-white flex items-center gap-1 justify-center">
+                          @{top3[0].username}
+                          {top3[0].rol === 'admin' && <ShieldCheck className="w-4 h-4 text-emerald-400" />}
+                        </h3>
+                        <p className="text-xs text-slate-400 font-medium">{top3[0].full_name || 'Líder del Ranking'}</p>
+                      </div>
                     </div>
-                  </Link>
+
+                    {/* Stats de #1 */}
+                    <div className="grid grid-cols-3 gap-2 bg-[#06080e] p-3 rounded-2xl border border-slate-800 text-center text-xs">
+                      <div>
+                        <span className="text-[9px] text-slate-500 block font-mono">YIELD</span>
+                        <span className={`font-black text-sm ${top3[0].yield_rate >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                          {top3[0].yield_rate > 0 ? `+${top3[0].yield_rate}%` : `${top3[0].yield_rate}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-500 block font-mono">WIN RATE</span>
+                        <span className="font-extrabold text-xs text-white">{top3[0].win_rate}%</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-500 block font-mono">PICKS</span>
+                        <span className="font-extrabold text-xs text-slate-300">{top3[0].total_picks}</span>
+                      </div>
+                    </div>
+
+                    <Link 
+                      href={`/perfil/${top3[0].username}`}
+                      className="bg-amber-500 hover:bg-amber-400 text-black font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1 shadow-lg shadow-amber-500/20"
+                    >
+                      <span>Ver Perfil Completo</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
                 )}
 
+                {/* 3er Lugar (Derecha en desktop) */}
+                {top3[2] && (
+                  <div className="order-3 bg-[#0c0f17] border border-slate-800/90 hover:border-slate-700 transition rounded-3xl p-5 space-y-4 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-3 right-3 bg-amber-700/20 border border-amber-700/40 text-amber-500 px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono flex items-center gap-1">
+                      <Award className="w-3 h-3 text-amber-600" /> #3 LUGAR
+                    </div>
+
+                    <div className="flex flex-col items-center text-center space-y-3 pt-2">
+                      <div className="relative">
+                        <img 
+                          src={top3[2].avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                          alt={top3[2].username}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-amber-700 shadow-md"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-white flex items-center gap-1 justify-center">
+                          @{top3[2].username}
+                          {top3[2].rol === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">{top3[2].full_name || 'Tipster Pro'}</p>
+                      </div>
+                    </div>
+
+                    {/* Stats de #3 */}
+                    <div className="grid grid-cols-2 gap-2 bg-[#06080e] p-3 rounded-2xl border border-slate-800 text-center text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block font-mono">YIELD</span>
+                        <span className={`font-black ${top3[2].yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {top3[2].yield_rate > 0 ? `+${top3[2].yield_rate}%` : `${top3[2].yield_rate}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block font-mono">WIN RATE</span>
+                        <span className="font-bold text-white">{top3[2].win_rate}%</span>
+                      </div>
+                    </div>
+
+                    <Link 
+                      href={`/perfil/${top3[2].username}`}
+                      className="bg-slate-800/60 hover:bg-slate-800 text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1"
+                    >
+                      <span>Ver Historial</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* TABLA RESTO DE POSICIONES (#4 EN ADELANTE) */}
-            <div className="bg-[#0c0f17] border border-slate-800/90 rounded-3xl p-4 sm:p-6 space-y-3 shadow-xl">
-              <h3 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider px-2">
-                Clasificación General
-              </h3>
+            {/* TABLA GENERAL DE TIPSTERS (#4 EN ADELANTE) */}
+            <div className="bg-[#0c0f17] border border-slate-800/90 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-slate-800/80 bg-[#090c13] flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 font-mono flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-emerald-400" />
+                  TABLA GENERAL DE CLASIFICACIÓN
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {filteredProfiles.length} TIPSTERS ACTIVOS
+                </span>
+              </div>
 
-              <div className="space-y-2">
-                {(searchQuery ? filteredTipsters : restTipsters).map((tipster, idx) => {
-                  const rankIndex = searchQuery ? idx + 1 : idx + 4;
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800/80 text-slate-500 font-mono text-[10px] uppercase bg-[#06080e]/50">
+                      <th className="py-3 px-4 text-center">Pos</th>
+                      <th className="py-3 px-4">Tipster</th>
+                      <th className="py-3 px-4 text-center">Picks</th>
+                      <th className="py-3 px-4 text-center">Win Rate %</th>
+                      <th className="py-3 px-4 text-center">Yield %</th>
+                      <th className="py-3 px-4 text-right">Profit Est.</th>
+                      <th className="py-3 px-4 text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
+                    {filteredProfiles.map((profile, index) => {
+                      const rank = index + 1;
+                      const isTop3 = rank <= 3 && !searchQuery;
 
-                  return (
-                    <Link
-                      key={tipster.id}
-                      href={`/perfil/${tipster.username}`}
-                      className="flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-[#06080e] border border-slate-800/80 hover:border-emerald-500/40 transition group"
-                    >
-                      <div className="flex items-center gap-3 sm:gap-4">
-                        <span className="font-mono text-xs font-bold text-slate-500 w-6 text-center">
-                          #{rankIndex}
-                        </span>
-
-                        <img 
-                          src={tipster.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                          alt={tipster.username}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-700 shrink-0"
-                        />
-
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs sm:text-sm text-white group-hover:text-emerald-400 transition">
-                              @{tipster.username}
-                            </span>
-                            {tipster.is_verified && (
-                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      return (
+                        <tr 
+                          key={profile.id}
+                          className={`hover:bg-slate-800/30 transition ${isTop3 ? 'bg-slate-900/20' : ''}`}
+                        >
+                          {/* Posición */}
+                          <td className="py-3.5 px-4 text-center font-bold font-mono">
+                            {rank === 1 ? (
+                              <span className="text-amber-400">🥇 #1</span>
+                            ) : rank === 2 ? (
+                              <span className="text-slate-300">🥈 #2</span>
+                            ) : rank === 3 ? (
+                              <span className="text-amber-600">🥉 #3</span>
+                            ) : (
+                              <span className="text-slate-500">#{rank}</span>
                             )}
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {tipster.total_picks || 0} pronósticos publicados
-                          </span>
-                        </div>
-                      </div>
+                          </td>
 
-                      <div className="flex items-center gap-4 sm:gap-6 text-right">
-                        <div>
-                          <span className="text-[10px] text-slate-500 block font-mono">Win Rate</span>
-                          <span className="text-xs font-bold text-amber-400 font-mono">
-                            {tipster.win_rate || 0}%
-                          </span>
-                        </div>
+                          {/* Avatar + Usuario */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                                alt={profile.username} 
+                                className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0"
+                              />
+                              <div>
+                                <div className="font-bold text-white text-xs flex items-center gap-1">
+                                  <span>@{profile.username}</span>
+                                  {profile.rol === 'admin' && <ShieldCheck className="w-3 h-3 text-emerald-400" />}
+                                </div>
+                                <div className="text-[10px] text-slate-500">{profile.full_name || 'Tipster'}</div>
+                              </div>
+                            </div>
+                          </td>
 
-                        <div>
-                          <span className="text-[10px] text-slate-500 block font-mono">Yield %</span>
-                          <span className={`text-xs sm:text-sm font-black font-mono ${tipster.yield_rate >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                            {tipster.yield_rate > 0 ? `+${tipster.yield_rate}` : tipster.yield_rate}%
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+                          {/* Total Picks */}
+                          <td className="py-3.5 px-4 text-center font-mono text-slate-400">
+                            {profile.total_picks || 0}
+                          </td>
+
+                          {/* Win Rate */}
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-white">
+                            {profile.win_rate || 0}%
+                          </td>
+
+                          {/* Yield % */}
+                          <td className="py-3.5 px-4 text-center font-mono font-black">
+                            <span className={`px-2 py-0.5 rounded ${
+                              (profile.yield_rate || 0) > 0 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : (profile.yield_rate || 0) < 0 
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                : 'text-slate-400'
+                            }`}>
+                              {(profile.yield_rate || 0) > 0 ? `+${profile.yield_rate}%` : `${profile.yield_rate || 0}%`}
+                            </span>
+                          </td>
+
+                          {/* Profit Estimate */}
+                          <td className="py-3.5 px-4 text-right font-mono font-bold">
+                            <span className={(profile.total_profit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                              {(profile.total_profit || 0) >= 0 ? `+$${profile.total_profit || 0}` : `-$${Math.abs(profile.total_profit || 0)}`} MXN
+                            </span>
+                          </td>
+
+                          {/* Enlace Perfil */}
+                          <td className="py-3.5 px-4 text-center">
+                            <Link 
+                              href={`/perfil/${profile.username}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-emerald-400 transition"
+                            >
+                              <span>Ver</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </>
+
+          </div>
         )}
 
       </div>

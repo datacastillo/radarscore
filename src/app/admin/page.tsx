@@ -7,12 +7,14 @@ import {
   ShieldAlert, 
   CheckCircle2, 
   XCircle, 
+  MinusCircle,
   Search, 
   Loader2, 
   RefreshCw,
   Rocket,
   Image as ImageIcon,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 
 interface TicketAdmin {
@@ -52,7 +54,7 @@ export default function AdminPanelPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          router.push('/');
+          router.push('/?openAuth=true');
           return;
         }
 
@@ -99,28 +101,30 @@ export default function AdminPanelPage() {
       if (error) throw error;
       setTickets(data || []);
     } catch (err: any) {
-      console.error('Error al cargar tickets pendientes:', err);
+      console.error('Error al cargar tickets pendientes:', err?.message || err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Función de respaldo para actualizar perfiles si no existe el RPC
+  // Función de respaldo para actualizar estadísticas del perfil si falla el RPC
   const fallbackUpdateProfile = async (userId: string) => {
     const { data: userTickets } = await supabase
       .from('tickets')
       .select('*')
       .eq('user_id', userId)
-      .in('status', ['WIN', 'LOSS', 'WON', 'LOST']);
+      .in('status', ['WIN', 'LOSS', 'WON', 'LOST', 'VOID']);
 
     if (!userTickets) return;
 
-    const totalPicks = userTickets.length;
-    const wonPicks = userTickets.filter(t => t.status === 'WIN' || t.status === 'WON').length;
+    // Excluir VOID del cómputo de WinRate
+    const settledTickets = userTickets.filter(t => t.status !== 'VOID');
+    const totalPicks = settledTickets.length;
+    const wonPicks = settledTickets.filter(t => t.status === 'WIN' || t.status === 'WON').length;
     const winRate = totalPicks > 0 ? (wonPicks / totalPicks) * 100 : 0;
 
-    // Solo tickets elegibles (odds < 10.0) para Yield
-    const eligibleTickets = userTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
+    // Solo tickets elegibles (cuota < 10.0 y no soñador) para Yield
+    const eligibleTickets = settledTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
     let totalStaked = 0;
     let totalReturned = 0;
 
@@ -146,17 +150,14 @@ export default function AdminPanelPage() {
       .eq('id', userId);
   };
 
-  const handleResolve = async (ticket: TicketAdmin, newStatus: 'WIN' | 'LOSS' | 'WON' | 'LOST') => {
+  const handleResolve = async (ticket: TicketAdmin, newStatus: 'WIN' | 'LOSS' | 'VOID') => {
     setResolvingId(ticket.id);
     try {
-      // Normalizar a WIN / LOSS para compatibilidad estricta con la restricción SQL
-      const statusToSave = (newStatus === 'WIN' || newStatus === 'WON') ? 'WIN' : 'LOSS';
-
       // 1. Actualizar el estado del ticket en Supabase
       const { error: updateError } = await supabase
         .from('tickets')
         .update({ 
-          status: statusToSave,
+          status: newStatus,
           resolved_at: new Date().toISOString()
         })
         .eq('id', ticket.id);
@@ -166,15 +167,15 @@ export default function AdminPanelPage() {
       // 2. Intentar llamar al RPC de Supabase para recalcular estadísticas
       const { error: rpcError } = await supabase.rpc('recalculate_user_stats', { target_user_id: ticket.user_id });
 
-      // Si el RPC falla o no está creado aún, usamos el fallback
+      // Si el RPC falla o no está disponible, se ejecuta la función de respaldo
       if (rpcError) {
         await fallbackUpdateProfile(ticket.user_id);
       }
 
-      // 3. Remover el ticket de la lista local
+      // 3. Remover el ticket de la lista activa
       setTickets(prev => prev.filter(t => t.id !== ticket.id));
     } catch (err: any) {
-      alert('Error al liquidar el ticket: ' + (err.message || err));
+      alert('Error al liquidar el ticket: ' + (err?.message || err));
     } finally {
       setResolvingId(null);
     }
@@ -189,65 +190,74 @@ export default function AdminPanelPage() {
 
   if (authChecking) {
     return (
-      <div className="min-h-screen bg-[#0B0E14] text-white flex items-center justify-center">
-        <div className="flex items-center gap-3 bg-[#141A23] border border-gray-800 p-6 rounded-2xl shadow-2xl">
+      <div className="min-h-screen bg-[#07090e] text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 bg-[#0c0f17] border border-slate-800 p-6 rounded-2xl shadow-2xl">
           <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
-          <span className="text-xs font-bold text-gray-300">Verificando credenciales de administrador...</span>
+          <span className="text-xs font-bold text-slate-300">Verificando credenciales de administrador...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-white py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#07090e] text-slate-100 py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-emerald-500 selection:text-black">
+      <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Admin Header */}
-        <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20 text-amber-400">
+        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl">
+          <div className="flex items-center gap-3.5">
+            <div className="bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20 text-amber-400 shrink-0">
               <ShieldAlert className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-white">Panel de Verificación de Tickets</h1>
-              <p className="text-xs text-gray-400">
-                Liquida los resultados oficializados para mantener el ranking y estadísticas al día.
+              <h1 className="text-lg font-black text-white tracking-tight">Panel de Verificación de Tickets</h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Liquida los resultados oficializados para mantener el ranking y estadísticas de la comunidad al día.
               </p>
             </div>
           </div>
 
           <button
             onClick={fetchPendingTickets}
-            className="bg-[#0B0E14] hover:bg-gray-800 text-gray-300 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 border border-gray-800 transition cursor-pointer"
+            className="bg-[#06080e] hover:bg-slate-800 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 border border-slate-800 transition cursor-pointer shrink-0 active:scale-95"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar Lista
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${loading ? 'animate-spin' : ''}`} />
+            <span>Actualizar Lista</span>
           </button>
         </div>
 
-        {/* Search / Filter Bar */}
-        <div className="bg-[#141A23] border border-gray-800 rounded-2xl p-3 flex items-center gap-3">
-          <Search className="w-4 h-4 text-gray-500 ml-2" />
-          <input
-            type="text"
-            placeholder="Filtrar por partido, usuario, liga o pronóstico..."
-            value={filterMatch}
-            onChange={(e) => setFilterMatch(e.target.value)}
-            className="bg-transparent text-xs text-white placeholder-gray-500 focus:outline-none flex-1"
-          />
+        {/* Bar de Filtros y Contador */}
+        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Filtrar por partido, usuario, liga o pick..."
+              value={filterMatch}
+              onChange={(e) => setFilterMatch(e.target.value)}
+              className="w-full bg-[#06080e] border border-slate-800 focus:border-emerald-500/50 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition font-medium"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-slate-400">TICKETS PENDIENTES:</span>
+            <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-0.5 rounded-lg font-bold">
+              {filteredTickets.length}
+            </span>
+          </div>
         </div>
 
-        {/* Pending Tickets Table / Grid */}
+        {/* Grid de Tickets Pendientes */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-gray-400 gap-2 text-sm">
+          <div className="flex items-center justify-center py-20 text-slate-400 gap-2 text-xs">
             <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
             <span>Cargando tickets pendientes...</span>
           </div>
         ) : filteredTickets.length === 0 ? (
-          <div className="bg-[#141A23] border border-gray-800 rounded-3xl p-12 text-center space-y-3">
+          <div className="bg-[#0c0f17] border border-slate-800/80 rounded-3xl p-12 text-center space-y-3">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto opacity-80" />
-            <h3 className="text-lg font-bold text-gray-200">¡Todo al día!</h3>
-            <p className="text-xs text-gray-500">No hay apuestas ni capturas pendientes por validar en este momento.</p>
+            <h3 className="text-base font-bold text-slate-200">¡Todo al día!</h3>
+            <p className="text-xs text-slate-500">No hay apuestas ni capturas pendientes por validar en este momento.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -257,18 +267,18 @@ export default function AdminPanelPage() {
               return (
                 <div 
                   key={ticket.id} 
-                  className="bg-[#141A23] border border-gray-800 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col justify-between relative overflow-hidden"
+                  className="bg-[#0c0f17] border border-slate-800/90 hover:border-slate-700 transition duration-200 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col justify-between relative overflow-hidden"
                 >
                   <div className="space-y-3">
-                    {/* User Info & Badges */}
-                    <div className="flex items-center justify-between border-b border-gray-800/80 pb-3">
+                    {/* Header Usuario */}
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                       <div className="flex items-center gap-2.5">
                         <img 
                           src={ticket.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
                           alt="Avatar" 
-                          className="w-7 h-7 rounded-full object-cover border border-gray-700"
+                          className="w-8 h-8 rounded-full object-cover border border-slate-700"
                         />
-                        <span className="text-xs font-bold text-white">@{ticket.profiles?.username || 'usuario'}</span>
+                        <span className="text-xs font-bold text-slate-200">@{ticket.profiles?.username || 'usuario'}</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -277,49 +287,50 @@ export default function AdminPanelPage() {
                             <Rocket className="w-2.5 h-2.5" /> SOÑADOR
                           </span>
                         )}
-                        <span className="text-[10px] text-gray-500 font-mono">
-                          {new Date(ticket.created_at).toLocaleDateString()}
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {new Date(ticket.created_at).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
 
-                    {/* League & Match Title */}
+                    {/* Liga y Partido */}
                     <div>
-                      <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 uppercase font-mono">
                         {ticket.league || 'Liga General'}
                       </span>
-                      <h3 className="text-base font-black text-white mt-1">{ticket.match_title}</h3>
+                      <h3 className="text-sm font-black text-white mt-1.5">{ticket.match_title}</h3>
                     </div>
 
-                    {/* Selection, Odds & Stake */}
-                    <div className="bg-[#0B0E14] border border-gray-800/80 p-3 rounded-2xl flex justify-between items-center text-xs">
+                    {/* Selección, Cuota y Stake */}
+                    <div className="bg-[#06080e] border border-slate-800/80 p-3 rounded-2xl flex justify-between items-center text-xs">
                       <div>
-                        <span className="text-[10px] text-gray-500 block">Selección:</span>
+                        <span className="text-[10px] text-slate-500 block">Selección:</span>
                         <span className="font-extrabold text-amber-400">{ticket.selection}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-gray-500 block">Cuota / Stake:</span>
+                        <span className="text-[10px] text-slate-500 block">Cuota / Stake:</span>
                         <span className="font-bold text-white">@{ticket.odds} | ${ticket.stake} MXN</span>
                       </div>
                     </div>
 
-                    {/* Imagen / Screenshot Adjunto (Si existe) */}
+                    {/* Captura / Screenshot Adjunto */}
                     {ticket.image_url && (
                       <div className="space-y-1">
-                        <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
                           <ImageIcon className="w-3 h-3 text-emerald-400" /> Captura Adjunta:
                         </span>
                         <div 
                           onClick={() => setSelectedImage(ticket.image_url || null)}
-                          className="relative rounded-2xl overflow-hidden border border-gray-800 bg-[#0B0E14] h-32 cursor-pointer group"
+                          className="relative rounded-2xl overflow-hidden border border-slate-800 bg-[#06080e] h-32 cursor-pointer group"
                         >
                           <img 
                             src={ticket.image_url} 
                             alt="Boleto" 
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 text-xs font-bold text-white">
-                            <ExternalLink className="w-4 h-4" /> Ver Captura Completa
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-xs font-bold text-white backdrop-blur-[2px]">
+                            <ExternalLink className="w-4 h-4 text-emerald-400" />
+                            <span>Ver Captura Completa</span>
                           </div>
                         </div>
                       </div>
@@ -327,25 +338,25 @@ export default function AdminPanelPage() {
 
                     {/* Comentario / Análisis */}
                     {ticket.comment && (
-                      <p className="text-[11px] text-gray-400 italic bg-[#0B0E14]/50 p-2.5 rounded-xl border border-gray-800/50">
+                      <p className="text-[11px] text-slate-300 italic bg-[#06080e]/60 p-2.5 rounded-xl border border-slate-800/60 leading-relaxed">
                         "{ticket.comment}"
                       </p>
                     )}
                   </div>
 
-                  {/* Quick Resolve Actions */}
-                  <div className="pt-3 flex gap-2 border-t border-gray-800/80 mt-2">
+                  {/* Acciones de Verificación / Resolución */}
+                  <div className="pt-3 flex gap-2 border-t border-slate-800/80 mt-2">
                     <button
                       disabled={resolvingId === ticket.id}
                       onClick={() => handleResolve(ticket, 'WIN')}
-                      className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="flex-1 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 shadow-sm"
                     >
                       {resolvingId === ticket.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
                           <CheckCircle2 className="w-4 h-4" />
-                          <span>Aprobar GANADA</span>
+                          <span>GANADO</span>
                         </>
                       )}
                     </button>
@@ -353,16 +364,25 @@ export default function AdminPanelPage() {
                     <button
                       disabled={resolvingId === ticket.id}
                       onClick={() => handleResolve(ticket, 'LOSS')}
-                      className="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="flex-1 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       {resolvingId === ticket.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
                           <XCircle className="w-4 h-4" />
-                          <span>Marcar PERDIDA</span>
+                          <span>PERDIDO</span>
                         </>
                       )}
+                    </button>
+
+                    <button
+                      disabled={resolvingId === ticket.id}
+                      onClick={() => handleResolve(ticket, 'VOID')}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      title="Marcar como NULO / REEMBOLSO"
+                    >
+                      <MinusCircle className="w-4 h-4" />
                     </button>
                   </div>
 
@@ -372,23 +392,29 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* Modal de Zoom de Captura */}
+        {/* Lightbox / Modal para Inspeccionar Captura */}
         {selectedImage && (
           <div 
             onClick={() => setSelectedImage(null)}
-            className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+            className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn cursor-zoom-out"
           >
-            <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center">
-              <button 
-                onClick={() => setSelectedImage(null)}
-                className="absolute -top-10 right-0 text-gray-400 hover:text-white bg-gray-800/60 p-2 rounded-full cursor-pointer"
-              >
-                ✕ Cerrar
-              </button>
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-3xl w-full bg-[#0c0f17] border border-emerald-500/30 rounded-3xl p-3 shadow-[0_0_50px_rgba(16,185,129,0.2)]"
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 px-2">
+                <span className="text-xs font-mono font-bold text-emerald-400">Verificación de Captura</span>
+                <button 
+                  onClick={() => setSelectedImage(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1 rounded-xl transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
               <img 
                 src={selectedImage} 
                 alt="Boleto Ampliado" 
-                className="max-h-[85vh] w-auto rounded-2xl border border-emerald-500/30 shadow-2xl object-contain"
+                className="max-h-[80vh] w-full object-contain rounded-2xl border border-slate-800"
               />
             </div>
           </div>

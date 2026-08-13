@@ -36,6 +36,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
   // Estados de interfaz
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -52,6 +53,25 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     setShowConfirmPassword(false);
   };
 
+  // Inicio de Sesión con Google OAuth
+  const handleGoogleAuth = async () => {
+    setGoogleLoading(true);
+    setErrorMsg(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/comunidad`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al conectar con Google.');
+      setGoogleLoading(false);
+    }
+  };
+
+  // Inicio de Sesión / Registro con Correo
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -65,17 +85,28 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           email,
           password,
         });
+
         if (error) throw error;
+
         if (onSuccess) onSuccess();
         onClose();
       } else {
         // Validación de contraseñas
         if (password !== confirmPassword) {
-          throw new Error('Las contraseñas no coinciden. Verifícalas e intenta de nuevo.');
+          throw new Error('Las contraseñas no coinciden. Verífilas e intenta de nuevo.');
         }
 
         if (password.length < 6) {
           throw new Error('La contraseña debe tener al menos 6 caracteres.');
+        }
+
+        const cleanUsername = (username || email.split('@')[0])
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '');
+
+        if (!cleanUsername) {
+          throw new Error('Por favor ingresa un nombre de usuario válido.');
         }
 
         // Definir la URL de redirección post-confirmación
@@ -83,25 +114,39 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           ? `${window.location.origin}/auth/callback` 
           : undefined;
 
-        // Registro de usuario con redirección de correo
+        // Registro de usuario en Supabase Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: redirectUrl,
             data: {
-              username: username || email.split('@')[0],
-              full_name: username || email.split('@')[0],
+              username: cleanUsername,
+              full_name: cleanUsername,
             },
           },
         });
 
         if (error) throw error;
 
-        // 💡 VALIDACIÓN DE CORREO DUPLICADO:
-        // Supabase devuelve `identities` como array vacío si el correo ya existe
+        // Validación de correo duplicado
         if (data.user && data.user.identities && data.user.identities.length === 0) {
           throw new Error('Este correo electrónico ya está registrado. Por favor, inicia sesión.');
+        }
+
+        // Crear/Asegurar registro en la tabla de perfiles
+        if (data.user) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            username: cleanUsername,
+            full_name: cleanUsername,
+            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
+            total_picks: 0,
+            win_rate: 0,
+            yield_rate: 0,
+            total_profit: 0,
+            rol: 'user'
+          });
         }
 
         // Si requiere confirmación por correo (session = null)
@@ -124,7 +169,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       
-      {/* Fondo con Blur de Alta Calidad */}
+      {/* Fondo con Blur */}
       <div 
         className="fixed inset-0 bg-[#07090E]/85 backdrop-blur-md transition-opacity animate-fadeIn"
         onClick={() => {
@@ -136,7 +181,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       {/* Tarjeta del Formulario */}
       <div className="relative w-full max-w-md bg-[#121721] border border-gray-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-hidden animate-fadeIn">
         
-        {/* Luz ambient neón */}
+        {/* Luz ambiental neón */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-32 bg-emerald-500/10 blur-[80px] pointer-events-none" />
 
         {/* Botón Cerrar */}
@@ -166,7 +211,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         </div>
 
         {/* Switch Selector (Tabs) */}
-        <div className="flex bg-[#07090E] p-1 rounded-2xl border border-gray-800/80 mb-5">
+        <div className="flex bg-[#07090E] p-1 rounded-2xl border border-gray-800/80 mb-4">
           <button
             type="button"
             onClick={() => {
@@ -195,6 +240,34 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           >
             Registrarme
           </button>
+        </div>
+
+        {/* Botón de Google OAuth */}
+        <button
+          type="button"
+          onClick={handleGoogleAuth}
+          disabled={googleLoading}
+          className="w-full bg-[#07090E] hover:bg-gray-800/80 text-gray-200 border border-gray-800 py-3 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2.5 cursor-pointer mb-4 disabled:opacity-50"
+        >
+          {googleLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+          ) : (
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.1 9 5 12 5z" />
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12 0 14.5s.7 4.8 1.9 7.2l3.7-2.9z" />
+              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.1-6.4-5.2L1.9 16C3.7 19.7 7.5 22.3 12 22.3z" />
+            </svg>
+          )}
+          <span>Continuar con Google</span>
+        </button>
+
+        {/* Separador visual */}
+        <div className="relative flex items-center justify-center mb-4">
+          <div className="border-t border-gray-800/80 w-full" />
+          <span className="bg-[#121721] px-3 text-[10px] text-gray-500 font-mono font-bold uppercase shrink-0">
+            o usa tu correo
+          </span>
         </div>
 
         {/* Pantalla de Éxito / Confirmación de Email */}

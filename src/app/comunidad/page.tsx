@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
+import { fetchRealMatches } from '@/services/footballApi';
+import { Match, MOCK_MATCHES } from '@/data/mockMatches';
 import { 
   Flame, 
   MessageSquare, 
@@ -24,7 +26,11 @@ import {
   Smile,
   Sparkles,
   Share2,
-  Target
+  Target,
+  Bot,
+  Calendar,
+  BrainCircuit,
+  Sparkle
 } from 'lucide-react';
 
 interface Ticket {
@@ -74,10 +80,23 @@ interface CommentItem {
 export default function ComunidadPage() {
   const router = useRouter();
   
+  // Estado para Tickets de la Comunidad
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Estado para Partidos Reales
+  const [realMatches, setRealMatches] = useState<Match[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(true);
+  const [selectedLeague, setSelectedLeague] = useState<string>('TODAS');
+
+  // Referencia y pausa para el Auto-Scroll del Carrusel
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+
+  // Partido seleccionado para ver el Modal de Pronóstico e Inteligencia IA
+  const [selectedMatchForPrediction, setSelectedMatchForPrediction] = useState<Match | null>(null);
 
   const [activeTab, setActiveTab] = useState<'all' | 'trending' | 'live' | 'verified'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,6 +115,7 @@ export default function ComunidadPage() {
 
   useEffect(() => {
     checkUserAndInit();
+    loadMatches();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
@@ -110,6 +130,24 @@ export default function ComunidadPage() {
     };
   }, [router]);
 
+  // Movimiento Automático del Ticker
+  useEffect(() => {
+    if (loadingMatches || realMatches.length === 0 || isCarouselHovered) return;
+
+    const interval = setInterval(() => {
+      if (carouselRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+        if (scrollLeft + clientWidth >= scrollWidth - 10) {
+          carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          carouselRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+        }
+      }
+    }, 3200);
+
+    return () => clearInterval(interval);
+  }, [loadingMatches, realMatches, isCarouselHovered]);
+
   const checkUserAndInit = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -121,6 +159,23 @@ export default function ComunidadPage() {
     setCurrentUser(session.user);
     setIsAuthChecking(false);
     fetchTickets();
+  };
+
+  const loadMatches = async () => {
+    setLoadingMatches(true);
+    try {
+      const data = await fetchRealMatches();
+      if (data && data.length > 0) {
+        setRealMatches(data);
+      } else {
+        setRealMatches(MOCK_MATCHES as any);
+      }
+    } catch (err) {
+      console.error('Error al cargar partidos reales:', err);
+      setRealMatches(MOCK_MATCHES as any);
+    } finally {
+      setLoadingMatches(false);
+    }
   };
 
   const fetchTickets = async () => {
@@ -339,11 +394,36 @@ export default function ComunidadPage() {
   };
 
   const handleCopy = (ticket: Ticket) => {
-    const text = `🎯 ¡Ticket Real de @${ticket.profiles?.username || 'user'}!\n\n💬 ${ticket.comment || ticket.match_title}\n\n👉 Míralo en RadarScore.app`;
+    const text = `🎯 ¡Pick de la comunidad RadarScore de @${ticket.profiles?.username || 'user'}!\n\n💬 ${ticket.comment || ticket.match_title}\n\n👉 Míralo en RadarScore.app`;
     navigator.clipboard.writeText(text);
     setCopiedId(ticket.id);
     setTimeout(() => setCopiedId(null), 2500);
   };
+
+  const { displayedMatches, isFallback } = useMemo(() => {
+    if (!realMatches || realMatches.length === 0) {
+      return { displayedMatches: [], isFallback: false };
+    }
+
+    if (selectedLeague === 'TODAS') {
+      return { displayedMatches: realMatches, isFallback: false };
+    }
+
+    const key = selectedLeague.toUpperCase();
+    const specificMatches = realMatches.filter(m => {
+      const lName = (m.league || '').toUpperCase();
+      if (key === 'PREMIER') return lName.includes('PREMIER') || m.flag === '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
+      if (key === 'LALIGA') return lName.includes('LALIGA') || lName.includes('PRIMERA') || m.flag === '🇪🇸';
+      if (key === 'CHAMPIONS') return lName.includes('CHAMPIONS') || lName.includes('UEFA') || m.flag === '🇪🇺';
+      return lName.includes(key);
+    });
+
+    if (specificMatches.length > 0) {
+      return { displayedMatches: specificMatches, isFallback: false };
+    }
+
+    return { displayedMatches: realMatches, isFallback: true };
+  }, [realMatches, selectedLeague]);
 
   const filteredTickets = useMemo(() => {
     const cleanQuery = searchQuery.trim().toLowerCase();
@@ -373,7 +453,7 @@ export default function ComunidadPage() {
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-[#07090e] flex flex-col items-center justify-center space-y-3">
-        <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
+        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse">
           <Zap className="w-5 h-5 fill-emerald-400" />
         </div>
         <p className="text-[11px] text-slate-400 font-mono tracking-wider">Cargando RadarScore Feed...</p>
@@ -390,12 +470,12 @@ export default function ComunidadPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black text-white tracking-tight">Muro de Pronósticos</h1>
-                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full">
-                  PHOTO-FIRST
+                <h1 className="text-base sm:text-lg font-black text-white tracking-tight">Comunidad & Radar IA</h1>
+                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Bot className="w-3 h-3" /> LIVE AI
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">Capturas reales compartidas por la comunidad.</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Partidos en vivo, cartelera oficial y Picks de la IA.</p>
             </div>
 
             <button
@@ -413,9 +493,115 @@ export default function ComunidadPage() {
       </section>
 
       {/* CONTENEDOR CENTRAL */}
-      <main className="max-w-2xl mx-auto px-4 pt-4 pb-8 space-y-4">
-        
-        {/* WIDGET RÁPIDO */}
+      <main className="max-w-2xl mx-auto px-4 pt-3 pb-8 space-y-4">
+
+        {/* ⚽ SHOWCASE TICKER DINÁMICO */}
+        <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 space-y-2.5 shadow-lg relative overflow-hidden">
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <h2 className="text-[11px] font-black uppercase tracking-wider text-slate-200 flex items-center gap-1">
+                <span>Cartelera IA</span>
+              </h2>
+            </div>
+            
+            {/* Filtro compacto de ligas */}
+            <div className="flex items-center gap-1 text-[10px] font-medium overflow-x-auto custom-scrollbar">
+              {['TODAS', 'PREMIER', 'LALIGA', 'CHAMPIONS'].map(leagueKey => (
+                <button
+                  key={leagueKey}
+                  onClick={() => setSelectedLeague(leagueKey)}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer text-[10px] ${
+                    selectedLeague === leagueKey
+                      ? 'bg-emerald-500 text-slate-950 font-extrabold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  {leagueKey}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* CONTENEDOR TICKER */}
+          {loadingMatches ? (
+            <div className="flex gap-2.5 overflow-x-auto py-1">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="min-w-[210px] h-24 bg-slate-900/60 rounded-xl animate-pulse border border-slate-800/80" />
+              ))}
+            </div>
+          ) : displayedMatches.length === 0 ? (
+            <div className="p-3 text-center text-xs text-slate-400 font-mono bg-[#06080e] rounded-xl border border-slate-800/80">
+              ⚠️ No hay encuentros programados en la ventana actual.
+            </div>
+          ) : (
+            <div 
+              ref={carouselRef}
+              onMouseEnter={() => setIsCarouselHovered(true)}
+              onMouseLeave={() => setIsCarouselHovered(false)}
+              onTouchStart={() => setIsCarouselHovered(true)}
+              onTouchEnd={() => setIsCarouselHovered(false)}
+              className="flex gap-2.5 overflow-x-auto custom-scrollbar pb-1 pt-0.5 select-none scroll-smooth"
+            >
+              {displayedMatches.map(match => (
+                <div
+                  key={match.id}
+                  onClick={() => setSelectedMatchForPrediction(match)}
+                  className="min-w-[215px] max-w-[220px] bg-[#06080e] hover:bg-[#090d16] border border-slate-800 hover:border-emerald-500/50 transition-all duration-200 rounded-xl p-2.5 space-y-2 shrink-0 flex flex-col justify-between cursor-pointer group shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+                >
+                  {/* Encabezado */}
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 border-b border-slate-800/60 pb-1">
+                    <span className="truncate font-bold text-slate-300 flex items-center gap-1">
+                      <span>{match.flag}</span>
+                      <span className="truncate">{match.league}</span>
+                    </span>
+                    <span className="text-emerald-400 font-bold shrink-0">
+                      {match.time}
+                    </span>
+                  </div>
+
+                  {/* Equipos */}
+                  <div className="space-y-1 text-xs font-bold text-slate-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 truncate">
+                        {match.homeTeam.logo ? (
+                          <img src={match.homeTeam.logo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        ) : <span className="text-[9px]">⚽</span>}
+                        <span className="truncate text-[11px]">{match.homeTeam.name}</span>
+                      </div>
+                      <span className="font-mono text-[11px] text-emerald-400 font-black">{match.probs?.home}%</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 truncate">
+                        {match.awayTeam.logo ? (
+                          <img src={match.awayTeam.logo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        ) : <span className="text-[9px]">⚽</span>}
+                        <span className="truncate text-[11px] text-slate-300">{match.awayTeam.name}</span>
+                      </div>
+                      <span className="font-mono text-[11px] text-slate-400 font-bold">{match.probs?.away}%</span>
+                    </div>
+                  </div>
+
+                  {/* Badge de Pronóstico */}
+                  <div className="flex items-center justify-between text-[9px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-slate-950 transition duration-200">
+                    <span className="flex items-center gap-1 truncate">
+                      <Bot className="w-3 h-3" />
+                      <span className="truncate">{match.aiPrediction?.recommendation || 'Ver Análisis'}</span>
+                    </span>
+                    <Sparkle className="w-2.5 h-2.5 shrink-0" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* WIDGET PUBLICAR RÁPIDO */}
         <div 
           onClick={() => {
             if (!currentUser) setIsAuthModalOpen(true);
@@ -438,7 +624,7 @@ export default function ComunidadPage() {
           </div>
         </div>
 
-        {/* BUSCADOR Y FILTROS */}
+        {/* BUSCADOR Y FILTROS DEL FEED */}
         <div className="bg-[#0c0f17] border border-slate-800/90 rounded-2xl p-3 space-y-2.5 shadow-sm">
           <div className="relative w-full">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -510,7 +696,7 @@ export default function ComunidadPage() {
           </div>
         </div>
 
-        {/* FEED DE TICKETS */}
+        {/* FEED DE TICKETS DE LA COMUNIDAD */}
         {loading ? (
           <div className="space-y-4">
             {[1, 2].map(i => (
@@ -520,7 +706,7 @@ export default function ComunidadPage() {
         ) : filteredTickets.length === 0 ? (
           <div className="bg-[#0c0f17] border border-slate-800/80 rounded-2xl p-8 text-center space-y-2">
             <Search className="w-6 h-6 text-slate-500 mx-auto" />
-            <p className="text-xs text-slate-400">No hay capturas publicadas en esta categoría.</p>
+            <p className="text-xs text-slate-400">No hay publicaciones en esta categoría.</p>
           </div>
         ) : (
           filteredTickets.map(ticket => {
@@ -536,7 +722,7 @@ export default function ComunidadPage() {
                 key={ticket.id}
                 className={`bg-[#0c0f17] border-l-4 ${statusBorderColor} border-y border-r border-slate-800/90 hover:border-slate-700 transition-all rounded-2xl p-4 space-y-3 shadow-md`}
               >
-                {/* Header del Tipster & Badges */}
+                {/* Header Tipster */}
                 <div className="flex items-center justify-between text-xs">
                   <Link
                     href={`/perfil/${ticket.profiles?.username || 'user'}`}
@@ -561,7 +747,6 @@ export default function ComunidadPage() {
                   </Link>
 
                   <div className="flex items-center gap-1.5">
-                    {/* Insignia Parlay Soñador */}
                     {isDreamer && (
                       <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
                         <Rocket className="w-2.5 h-2.5" /> SOÑADOR
@@ -586,14 +771,14 @@ export default function ComunidadPage() {
                   </div>
                 </div>
 
-                {/* Comentario / Leyenda Principal */}
+                {/* Comentario */}
                 {ticket.comment && (
                   <p className="text-xs text-slate-200 leading-relaxed font-medium">
                     {ticket.comment}
                   </p>
                 )}
 
-                {/* Información de Selección/Cuota (Si aplica) */}
+                {/* Selección y Cuota */}
                 {ticket.selection && ticket.selection !== 'Ver Ticket' && (
                   <div className="bg-[#06080e] border border-slate-800/80 rounded-xl p-2.5 flex justify-between items-center text-xs">
                     <div className="flex items-center gap-1.5">
@@ -608,7 +793,7 @@ export default function ComunidadPage() {
                   </div>
                 )}
 
-                {/* 📸 CAPTURA PRINCIPAL DEL TICKET */}
+                {/* Captura de Apuesta */}
                 <div className="relative group rounded-2xl overflow-hidden border border-slate-800 bg-[#06080e]">
                   {ticket.image_url ? (
                     <div 
@@ -622,7 +807,7 @@ export default function ComunidadPage() {
                       />
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs backdrop-blur-[2px]">
                         <Maximize2 className="w-4 h-4 text-emerald-400" />
-                        <span>Ver imagen completa</span>
+                        <span>Ver captura completa</span>
                       </div>
                     </div>
                   ) : (
@@ -633,7 +818,7 @@ export default function ComunidadPage() {
                   )}
                 </div>
 
-                {/* Reacciones + Comentarios */}
+                {/* Reacciones */}
                 <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
                   <div className="flex items-center gap-1.5">
                     <button
@@ -703,7 +888,7 @@ export default function ComunidadPage() {
                   </button>
                 </div>
 
-                {/* Comentarios desplegables */}
+                {/* Comentarios */}
                 {expandedTicketId === ticket.id && (
                   <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5 animate-fadeIn">
                     {loadingComments === ticket.id ? (
@@ -712,7 +897,7 @@ export default function ComunidadPage() {
                         <span>Cargando comentarios...</span>
                       </div>
                     ) : !ticketComments[ticket.id] || ticketComments[ticket.id].length === 0 ? (
-                      <p className="text-xs text-slate-500 italic py-1">Sé el primero en comentar esta jugada.</p>
+                      <p className="text-xs text-slate-500 italic py-1">Sé el primero en comentar este pick.</p>
                     ) : (
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                         {ticketComments[ticket.id].map(comment => (
@@ -757,6 +942,82 @@ export default function ComunidadPage() {
 
       </main>
 
+      {/* 🤖 MODAL FLOTANTE DE CONSULTA DE ANÁLISIS E INTELIGENCIA IA */}
+      {selectedMatchForPrediction && (
+        <div 
+          onClick={() => setSelectedMatchForPrediction(null)}
+          className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0c0f17] border border-emerald-500/40 w-full max-w-md rounded-3xl p-5 space-y-4 shadow-[0_0_50px_rgba(16,185,129,0.2)] relative text-white cursor-default"
+          >
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <BrainCircuit className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase block">{selectedMatchForPrediction.league}</span>
+                  <h3 className="text-xs font-extrabold text-slate-100">{selectedMatchForPrediction.time}</h3>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMatchForPrediction(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Enfrentamiento */}
+            <div className="bg-[#06080e] border border-slate-800/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm font-black text-slate-100">
+                <div className="flex items-center gap-2">
+                  {selectedMatchForPrediction.homeTeam.logo ? (
+                    <img src={selectedMatchForPrediction.homeTeam.logo} alt="" className="w-5 h-5 object-contain" />
+                  ) : <span>⚽</span>}
+                  <span>{selectedMatchForPrediction.homeTeam.name}</span>
+                </div>
+                <span className="text-emerald-400 font-mono text-xs">{selectedMatchForPrediction.probs?.home}%</span>
+              </div>
+
+              <div className="flex items-center justify-between text-sm font-black text-slate-100">
+                <div className="flex items-center gap-2">
+                  {selectedMatchForPrediction.awayTeam.logo ? (
+                    <img src={selectedMatchForPrediction.awayTeam.logo} alt="" className="w-5 h-5 object-contain" />
+                  ) : <span>⚽</span>}
+                  <span>{selectedMatchForPrediction.awayTeam.name}</span>
+                </div>
+                <span className="text-slate-400 font-mono text-xs">{selectedMatchForPrediction.probs?.away}%</span>
+              </div>
+            </div>
+
+            {/* Pronóstico Destacado */}
+            {selectedMatchForPrediction.aiPrediction && (
+              <div className="bg-gradient-to-br from-emerald-500/15 to-emerald-950/30 border border-emerald-500/40 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono font-bold text-emerald-400">
+                  <span className="flex items-center gap-1"><Bot className="w-3.5 h-3.5" /> ANÁLISIS DE LA IA</span>
+                  <span className="bg-emerald-500/20 px-2 py-0.5 rounded-md">CONF. {selectedMatchForPrediction.aiPrediction.confidence}</span>
+                </div>
+
+                <p className="text-base font-black text-emerald-200">
+                  {selectedMatchForPrediction.aiPrediction.recommendation}
+                </p>
+
+                {selectedMatchForPrediction.aiPrediction.reasoning && (
+                  <p className="text-xs text-slate-300 leading-relaxed pt-2 border-t border-emerald-500/20">
+                    {selectedMatchForPrediction.aiPrediction.reasoning}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* LIGHTBOX AMPLIFICADOR */}
       {selectedImage && (
         <div 
@@ -770,7 +1031,7 @@ export default function ComunidadPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 px-2">
               <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400">
                 <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Captura de Ticket Ampliada</span>
+                <span>Captura Ampliada</span>
               </div>
               <button
                 onClick={() => setSelectedImage(null)}
@@ -782,37 +1043,41 @@ export default function ComunidadPage() {
 
             <img
               src={selectedImage}
-              alt="Ticket Real Ampliado"
+              alt="Boleto Ampliado"
               className="w-full h-auto max-h-[80vh] object-contain rounded-2xl border border-slate-800"
             />
           </div>
         </div>
       )}
 
-      {/* MODAL DE PUBLICACIÓN CLEAN */}
+      {/* MODAL CREAR PICK */}
       <CreatePickModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={() => {
-          fetchTickets();
-        }}
+        onSuccess={() => fetchTickets()}
       />
 
-      {/* MODAL DE AUTENTICACIÓN */}
+      {/* MODAL AUTH */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={() => {
-          checkUserAndInit();
-        }}
+        onSuccess={() => checkUserAndInit()}
       />
 
     </div>
   );
 }
 
-{/* MODAL DE PUBLICACIÓN MINIMALISTA & ULTRA CLEAN */}
-function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess?: () => void }) {
+{/* MODAL DE PUBLICACIÓN */}
+function CreatePickModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onSuccess?: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [comment, setComment] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>('🎯 Pick del Día');
@@ -850,11 +1115,6 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!imageFile && !imagePreview) {
-      alert('Por favor selecciona una captura de tu ticket.');
-      return;
-    }
 
     setLoading(true);
 
@@ -899,12 +1159,12 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
       const { error } = await supabase.from('tickets').insert([
         {
           user_id: user.id,
-          league: 'Captura Comunidad',
+          league: 'Comunidad Radar',
           match_title: 'Ticket de Apuesta',
           selection: selectedTag || 'Ver Ticket',
-          odds: 1.00,
+          odds: 1.80,
           stake: 100,
-          potential_payout: 100,
+          potential_payout: 180,
           comment: finalComment || null,
           image_url: imageUrl,
           status: 'PENDING'
@@ -917,7 +1177,7 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      alert('Error al publicar captura: ' + (err.message || err));
+      alert('Error al publicar ticket: ' + (err.message || err));
     } finally {
       setLoading(false);
     }
@@ -930,10 +1190,9 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
     >
       <div className="bg-[#0B0E14] border border-slate-800 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl relative text-white">
         
-        {/* Header Limpio */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Camera className="w-4 h-4 text-emerald-400" />
+            <Sparkles className="w-4 h-4 text-emerald-400" />
             <span>Publicar Ticket</span>
           </h2>
 
@@ -949,10 +1208,10 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           
           <textarea
-            rows={2}
+            rows={3}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="¿Qué jugaste hoy? Agrega un comentario opcional..."
+            placeholder="¿Qué opinas de este partido? Agrega un comentario opcional..."
             className="w-full bg-[#06080e] border border-slate-800/90 rounded-xl p-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none text-xs font-medium"
           />
 
@@ -976,9 +1235,9 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2.5 py-3 text-slate-400">
+              <div className="flex items-center justify-center gap-2.5 py-2 text-slate-400">
                 <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-xs font-medium text-slate-300">Haz clic para adjuntar la imagen del ticket</span>
+                <span className="text-xs font-medium text-slate-300">Adjuntar captura opcional del boleto</span>
               </div>
             )}
           </div>
@@ -1006,7 +1265,7 @@ function CreatePickModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onCl
           <div className="pt-2">
             <button
               type="submit"
-              disabled={loading || (!imageFile && !imagePreview)}
+              disabled={loading}
               className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 shadow-md shadow-emerald-500/20"
             >
               {loading ? (

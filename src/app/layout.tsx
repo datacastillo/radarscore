@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RadarScore | Comunidad de Tipsters Verificados",
-  description: "Pronósticos deportivos, verificación automática de tickets y ranking en tiempo real.",
+  title: "RadarScore | Comunidad de Tipsters Verificados & IA",
+  description: "Pronósticos deportivos con IA, verificación automática de tickets y ranking en tiempo real.",
 };
 
 export default function RootLayout({
@@ -30,13 +30,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-[#0B0E14] text-white selection:bg-emerald-500 selection:text-black font-sans">
-        {/* Navbar Global */}
+        
+        {/* Navbar Global (Header Superior + Bottom Bar Móvil) */}
         <Navbar />
 
-        {/* Contenido Dinámico */}
-        <main className="flex-1 w-full relative">
+        {/* Contenido Dinámico con espacio para Bottom Nav en Celulares */}
+        <main className="flex-1 w-full relative pb-16 md:pb-0">
           {children}
         </main>
+
       </body>
     </html>
   );
