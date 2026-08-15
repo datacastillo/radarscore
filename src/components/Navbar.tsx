@@ -99,8 +99,8 @@ function NavbarContent() {
   return (
     <>
       {/* HEADER SUPERIOR GLOBAL ADAPTATIVO */}
-      <header className="sticky top-0 z-50 bg-[#07090E]/90 backdrop-blur-md border-b border-gray-800/80">
-        <div className="max-w-6xl mx-auto px-2.5 sm:px-4 h-16 flex items-center justify-between gap-1.5 sm:gap-4">
+      <header className="sticky top-0 z-50 bg-[#07090E]/90 backdrop-blur-md border-b border-gray-800/80 w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-2.5 sm:px-4 h-16 flex items-center justify-between gap-1 sm:gap-4">
           
           {/* Logo Brand */}
           <Link href="/" className="flex items-center gap-2 group shrink-0">
@@ -117,8 +117,8 @@ function NavbarContent() {
             </div>
           </Link>
 
-          {/* Links Navegación Central */}
-          <nav className="flex items-center gap-0.5 sm:gap-1 bg-[#0c0f17] p-1 rounded-2xl border border-gray-800">
+          {/* Links Navegación Central (Iconos en celular, Texto completo en PC) */}
+          <nav className="flex items-center gap-0.5 sm:gap-1 bg-[#0c0f17] p-1 rounded-2xl border border-gray-800 shrink-0">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
@@ -134,7 +134,7 @@ function NavbarContent() {
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{link.name}</span>
+                  <span className="hidden sm:inline">{link.name}</span>
                 </Link>
               );
             })}
