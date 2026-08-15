@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Usamos las variables de entorno, y en caso de no estar definidas durante el build de Vercel,
-// asignamos un valor por defecto para evitar que la compilación se rompa con "supabaseUrl is required".
-const supabaseUrl = 
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dkexdxmgkdzoovksuqms.supabase.co';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabaseAnonKey = 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_anon_key';
-
-// 🔍 Diagnóstico temporal: imprime la URL detectada en la consola del navegador
-if (typeof window !== 'undefined') {
-  console.log('👉 URL de Supabase detectada:', supabaseUrl);
+// Si faltan las variables de entorno, preferimos que el build/runtime falle
+// con un mensaje claro en vez de conectarnos silenciosamente con un placeholder
+// inválido (eso generaría errores confusos e intermitentes en producción).
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    '❌ Faltan las variables de entorno de Supabase (NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY). ' +
+    'Verifica que estén configuradas en Vercel (Settings → Environment Variables) para este ambiente (Production/Preview/Development).'
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
