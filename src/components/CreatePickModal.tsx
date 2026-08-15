@@ -204,18 +204,18 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
   return (
     <div 
       onClick={(e) => e.target === e.currentTarget && handleClose()}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
     >
       {/* Contenedor Principal */}
-      <div className="bg-[#0F141C] border border-emerald-500/30 w-full max-w-lg rounded-3xl p-6 sm:p-7 space-y-4 shadow-[0_0_50px_rgba(16,185,129,0.12)] relative text-white max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div className="bg-[#0F141C] border border-emerald-500/20 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative text-white max-h-[90vh] overflow-y-auto custom-scrollbar">
         
         {/* Luz ambiental sutil */}
         <div className="absolute -top-20 -left-20 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Encabezado */}
-        <div className="flex items-center justify-between border-b border-gray-800/80 pb-3.5 relative z-10">
+        <div className="flex items-center justify-between border-b border-gray-800/80 pb-3 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
               <Zap className="w-4 h-4 fill-emerald-400" />
             </div>
             <div>
@@ -233,17 +233,17 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
           </button>
         </div>
 
-        {/* 🛡️ BANNER DE TRANSPARENCIA Y JUEGO LIMPIO */}
+        {/* BANNER DE TRANSPARENCIA */}
         <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-3 flex items-start gap-2.5 text-[11px] text-amber-200/90 leading-relaxed relative z-10">
           <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <span className="font-extrabold text-amber-300 block mb-0.5">Política de Juego Limpio & Transparencia</span>
-            La cuota y selección ingresadas deben coincidir exactamente con las de tu boleto. Picks alterados o que no coincidan con la captura adjunta serán anulados por la administración.
+            <span className="font-extrabold text-amber-300 block mb-0.5">Política de Juego Limpio</span>
+            La cuota y selección ingresadas deben coincidir exactamente con las de tu boleto. Picks alterados serán anulados por la administración.
           </div>
         </div>
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs relative z-10">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs relative z-10">
           
           {/* Ligas Selector */}
           <div className="space-y-2">
@@ -259,8 +259,8 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                   onClick={() => setLeague(item)}
                   className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition border cursor-pointer ${
                     league === item
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm shadow-emerald-500/10'
-                      : 'bg-[#161C26] text-gray-400 border-gray-800/80 hover:border-gray-700 hover:text-gray-200'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm'
+                      : 'bg-[#161C26] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
                   }`}
                 >
                   {item}
@@ -272,7 +272,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                 className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition border cursor-pointer ${
                   league === 'Otra'
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                    : 'bg-[#161C26] text-gray-400 border-gray-800/80 hover:border-gray-700'
+                    : 'bg-[#161C26] text-gray-400 border-gray-800 hover:border-gray-700'
                 }`}
               >
                 + Otra
@@ -303,13 +303,13 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                 onChange={(e) => setMatchTitle(e.target.value)}
                 placeholder="Ej. Santos vs América"
                 required
-                className="w-full bg-[#161C26] border border-gray-800/90 rounded-xl p-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/80 font-semibold"
+                className="w-full bg-[#161C26] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-semibold text-xs"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-gray-300 font-bold flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-emerald-400" /> Tu Selección (Debe coincidir con el ticket)
+                <Target className="w-3.5 h-3.5 text-emerald-400" /> Tu Selección
               </label>
               <input
                 type="text"
@@ -317,17 +317,17 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                 onChange={(e) => setSelection(e.target.value)}
                 placeholder="Ej. Ambos Anotan"
                 required
-                className="w-full bg-[#161C26] border border-gray-800/90 rounded-xl p-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/80 font-semibold"
+                className="w-full bg-[#161C26] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-semibold text-xs"
               />
             </div>
           </div>
 
-          {/* Cuota / Momio (Acepta +/- o Decimal) & Stake */}
+          {/* Cuota / Momio & Stake */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-gray-300 font-bold flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Momio Real del Ticket
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Momio / Cuota
                 </span>
                 {isDreamer && (
                   <span className="text-[9px] text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-0.5">
@@ -341,13 +341,13 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                 onChange={(e) => setOddsInput(e.target.value)}
                 placeholder="Ej. +250 o 1.85"
                 required
-                className="w-full bg-[#161C26] border border-gray-800/90 rounded-xl p-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-mono font-bold text-sm"
+                className="w-full bg-[#161C26] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-mono font-bold text-xs"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-gray-300 font-bold flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Stake ($ MXN)
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Stake / Monto
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-mono font-black">$</span>
@@ -359,19 +359,19 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                   onChange={(e) => setStake(e.target.value)}
                   placeholder="100"
                   required
-                  className="w-full bg-[#161C26] border border-gray-800/90 rounded-xl p-3 pl-7 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-mono font-bold text-sm"
+                  className="w-full bg-[#161C26] border border-gray-800 rounded-xl p-2.5 pl-7 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 font-mono font-bold text-xs"
                 />
               </div>
             </div>
           </div>
 
           {/* Tarjeta de Ganancia Estimada */}
-          <div className="bg-gradient-to-r from-[#141B26] via-[#18202E] to-[#141B26] border border-emerald-500/25 rounded-2xl p-3.5 flex items-center justify-between shadow-inner">
+          <div className="bg-gradient-to-r from-[#141B26] via-[#18202E] to-[#141B26] border border-emerald-500/20 rounded-2xl p-3 flex items-center justify-between shadow-inner">
             <div className="space-y-0.5">
               <span className="text-[10px] uppercase font-mono font-extrabold text-gray-400 flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3 text-emerald-400" /> Ganancia Estimada {parsedOdds > 0 && `(@${parsedOdds.toFixed(2)})`}
               </span>
-              <div className="text-emerald-400 font-mono font-black text-base tracking-tight">
+              <div className="text-emerald-400 font-mono font-black text-sm sm:text-base tracking-tight">
                 +${netProfit} <span className="text-[10px] text-emerald-500 font-semibold">MXN</span>
               </div>
             </div>
@@ -387,7 +387,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
           {/* Carga Opcional de Captura / Ticket */}
           <div className="space-y-1.5">
             <label className="text-gray-300 font-bold flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-emerald-400" /> Adjuntar Captura del Boleto (Recomendado)
+              <Camera className="w-3.5 h-3.5 text-emerald-400" /> Adjuntar Captura del Boleto (Opcional)
             </label>
             <div className="border border-dashed border-gray-800 hover:border-emerald-500/50 rounded-2xl p-2.5 bg-[#161C26] text-center cursor-pointer transition relative">
               <input
@@ -398,7 +398,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
               />
               {imagePreview ? (
                 <div className="relative inline-block w-full">
-                  <img src={imagePreview} alt="Preview" className="max-h-36 rounded-xl border border-gray-800 mx-auto object-contain" />
+                  <img src={imagePreview} alt="Preview" className="max-h-32 rounded-xl border border-gray-800 mx-auto object-contain" />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
@@ -408,7 +408,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-2 py-1.5 text-gray-400">
+                <div className="flex items-center justify-center gap-2 py-1 text-gray-400">
                   <Upload className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-xs font-medium text-gray-300">Sube aquí la imagen legible de tu apuesta</span>
                 </div>
@@ -426,7 +426,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="¿Por qué te gusta este pronóstico?"
-              className="w-full bg-[#161C26] border border-gray-800/90 rounded-xl p-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-none font-medium text-xs"
+              className="w-full bg-[#161C26] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-none font-medium text-xs"
             />
           </div>
 
@@ -435,7 +435,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
             <button
               type="button"
               onClick={handleClose}
-              className="w-1/3 bg-[#161C26] hover:bg-gray-800 text-gray-400 border border-gray-800 font-bold py-3.5 rounded-xl transition text-xs cursor-pointer active:scale-95"
+              className="w-1/3 bg-[#161C26] hover:bg-gray-800 text-gray-400 border border-gray-800 font-bold py-3 rounded-xl transition text-xs cursor-pointer active:scale-95"
             >
               Cancelar
             </button>
@@ -443,7 +443,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
             <button
               type="submit"
               disabled={loading}
-              className="w-2/3 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-slate-950 font-black py-3.5 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
+              className="w-2/3 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-slate-950 font-black py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
