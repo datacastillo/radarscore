@@ -152,7 +152,9 @@ export function calculatePoissonPrediction(
   const totalSum = rawHomeWin + rawDraw + rawAwayWin;
   const homeWinProb = Math.round((rawHomeWin / totalSum) * 100);
   const drawProb = Math.round((rawDraw / totalSum) * 100);
-  const awayWinProb = 100 - homeWinProb - drawProb;
+  // FIX: antes "100 - homeWinProb - drawProb" podía dar negativo cuando el
+  // redondeo independiente de cada probabilidad sumaba más de 100.
+  const awayWinProb = Math.max(0, 100 - homeWinProb - drawProb);
 
   const bttsProb = Math.min(95, Math.max(10, Math.round((rawBtts / totalSum) * 100)));
   const over25Prob = Math.min(95, Math.max(10, Math.round((rawOver25 / totalSum) * 100)));
@@ -219,7 +221,8 @@ export function calculatePoissonPrediction(
   const cornerSum = rawMostHome + rawMostDraw + rawMostAway;
   const mostCornersHomeProb = Math.round((rawMostHome / cornerSum) * 100);
   const mostCornersDrawProb = Math.round((rawMostDraw / cornerSum) * 100);
-  const mostCornersAwayProb = 100 - mostCornersHomeProb - mostCornersDrawProb;
+  // FIX: mismo problema de redondeo que awayWinProb — se protege contra negativos.
+  const mostCornersAwayProb = Math.max(0, 100 - mostCornersHomeProb - mostCornersDrawProb);
 
   const cornerStats: CornerStats = {
     expectedCornersHome: Number(lambdaCornerHome.toFixed(1)),
@@ -237,7 +240,15 @@ export function calculatePoissonPrediction(
   // 3. SELECCIÓN INTELIGENTE DEL PICK VIP
   // -------------------------------------------------------------
   const maxProb = Math.max(homeWinProb, drawProb, awayWinProb);
-  const confidence = Math.min(93, Math.max(68, Math.round(55 + (maxProb - 33.3) * 0.9)));
+
+  // FIX: antes había un piso artificial de 68%, así que un partido
+  // prácticamente parejo (33/33/34) igual mostraba "68% de confianza".
+  // Como maxProb nunca puede bajar de ~33.3 (es el máximo de 3 valores que
+  // suman 100), la fórmula ya tiene un piso NATURAL de 55% sin necesidad de
+  // forzarlo — así la confianza mostrada refleja honestamente qué tan
+  // parejo o decidido está el partido, sin perder el techo de 93% que evita
+  // sonar sobreconfiado en un evento probabilístico.
+  const confidence = Math.min(93, Math.round(55 + (maxProb - 33.3) * 0.9));
 
   let recommendedPick = '';
   let recommendedPickReason = '';
