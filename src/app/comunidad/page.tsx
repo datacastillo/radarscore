@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
+import CreatePickModal from '@/components/CreatePickModal';
 import { fetchRealMatches } from '@/services/footballApi';
 import { Match, MOCK_MATCHES } from '@/data/mockMatches';
 import { 
@@ -20,11 +21,9 @@ import {
   Rocket,
   Snowflake,
   Camera,
-  Upload,
   Maximize2,
   ImageIcon,
   Smile,
-  Sparkles,
   Share2,
   Target,
   Bot,
@@ -32,6 +31,8 @@ import {
   BrainCircuit,
   Sparkle
 } from 'lucide-react';
+
+
 
 interface Ticket {
   id: string;
@@ -1050,7 +1051,7 @@ export default function ComunidadPage() {
         </div>
       )}
 
-      {/* MODAL CREAR PICK */}
+      {/* MODAL CREAR PICK (momios, stake, liga, captura) */}
       <CreatePickModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -1064,224 +1065,6 @@ export default function ComunidadPage() {
         onSuccess={() => checkUserAndInit()}
       />
 
-    </div>
-  );
-}
-
-{/* MODAL DE PUBLICACIÓN */}
-function CreatePickModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  onSuccess?: () => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [comment, setComment] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string | null>('🎯 Pick del Día');
-
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  if (!isOpen) return null;
-
-  const QUICK_TAGS = ['🎯 Pick del Día', '🔥 All-In', '🚀 Confiado', '💎 Cuota Alta', '⚡ En Vivo'];
-
-  const resetForm = () => {
-    setComment('');
-    setImageFile(null);
-    setImagePreview(null);
-    setSelectedTag('🎯 Pick del Día');
-  };
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setLoading(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert('Debes iniciar sesión para publicar.');
-        setLoading(false);
-        return;
-      }
-
-      let imageUrl: string | null = null;
-
-      if (imageFile) {
-        try {
-          const fileExt = imageFile.name.split('.').pop();
-          const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-          const filePath = `ticket-screenshots/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('ticket-screenshots')
-            .upload(filePath, imageFile);
-
-          if (!uploadError) {
-            const { data: publicUrlData } = supabase.storage
-              .from('ticket-screenshots')
-              .getPublicUrl(filePath);
-            imageUrl = publicUrlData.publicUrl;
-          } else {
-            imageUrl = imagePreview;
-          }
-        } catch {
-          imageUrl = imagePreview;
-        }
-      } else if (imagePreview) {
-        imageUrl = imagePreview;
-      }
-
-      const finalComment = selectedTag ? `[${selectedTag}] ${comment.trim()}`.trim() : comment.trim();
-
-      const { error } = await supabase.from('tickets').insert([
-        {
-          user_id: user.id,
-          league: 'Comunidad Radar',
-          match_title: 'Ticket de Apuesta',
-          selection: selectedTag || 'Ver Ticket',
-          odds: 1.80,
-          stake: 100,
-          potential_payout: 180,
-          comment: finalComment || null,
-          image_url: imageUrl,
-          status: 'PENDING'
-        }
-      ]);
-
-      if (error) throw error;
-
-      resetForm();
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (err: any) {
-      alert('Error al publicar ticket: ' + (err.message || err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div 
-      onClick={(e) => e.target === e.currentTarget && handleClose()}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-    >
-      <div className="bg-[#0B0E14] border border-slate-800 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl relative text-white">
-        
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-          <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>Publicar Ticket</span>
-          </h2>
-
-          <button
-            type="button"
-            onClick={handleClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-          
-          <textarea
-            rows={3}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="¿Qué opinas de este partido? Agrega un comentario opcional..."
-            className="w-full bg-[#06080e] border border-slate-800/90 rounded-xl p-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none text-xs font-medium"
-          />
-
-          <div className="border border-dashed border-slate-700/80 hover:border-emerald-500/60 rounded-xl p-3 bg-[#06080e] text-center cursor-pointer transition relative group">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-            />
-            
-            {imagePreview ? (
-              <div className="relative inline-block w-full">
-                <img src={imagePreview} alt="Preview" className="max-h-48 rounded-lg border border-slate-800 mx-auto object-contain" />
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
-                  className="absolute top-1.5 right-1.5 bg-rose-500/90 text-white rounded-full p-1 hover:bg-rose-600 transition z-20 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2.5 py-2 text-slate-400">
-                <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-xs font-medium text-slate-300">Adjuntar captura opcional del boleto</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[10px] font-mono text-slate-400 block font-semibold uppercase">Etiqueta opcional</span>
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-              {QUICK_TAGS.map(tag => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition shrink-0 border cursor-pointer ${
-                    selectedTag === tag
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 font-bold'
-                      : 'bg-[#06080e] text-slate-400 border-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 shadow-md shadow-emerald-500/20"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
-                  <span>Publicar Ticket</span>
-                </>
-              )}
-            </button>
-          </div>
-
-        </form>
-
-      </div>
     </div>
   );
 }
