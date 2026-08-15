@@ -49,7 +49,7 @@ export default function DefinitiveHomePage() {
   const [activeTab, setActiveTab] = useState<'ai' | 'stats' | 'ranking'>('ai');
   const [copied, setCopied] = useState(false);
 
-  // Verificar estado de la sesión
+  // Verificar estado de la sesión y escuchar cambios
   useEffect(() => {
     const checkUserSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -57,14 +57,17 @@ export default function DefinitiveHomePage() {
     };
     checkUserSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (event === 'SIGNED_IN') {
+        router.push('/comunidad');
+      }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   // Secuencia de Carga Inicial
   useEffect(() => {
@@ -95,8 +98,9 @@ export default function DefinitiveHomePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Redirección al autenticarse exitosamente
+  // Redirección al autenticarse exitosamente desde el Modal
   const handleAuthSuccess = () => {
+    setIsAuthOpen(false);
     router.push('/comunidad');
   };
 
