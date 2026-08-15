@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { Match } from '@/data/mockMatches';
 
 interface MatchModalProps {
@@ -9,17 +11,33 @@ interface MatchModalProps {
 }
 
 export default function MatchModal({ match, onClose }: MatchModalProps) {
+  const router = useRouter();
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState<boolean>(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = aún verificando
 
-  // Llamada a la API de Gemini al abrir el Modal
+  // Llamada a la API de Gemini al abrir el Modal — SOLO si hay sesión activa
   useEffect(() => {
     async function fetchAnalysis() {
       setLoadingAi(true);
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setIsLoggedIn(false);
+        setLoadingAi(false);
+        return;
+      }
+
+      setIsLoggedIn(true);
+
       try {
         const res = await fetch('/api/analyze', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({
             homeTeam: match.homeTeam.name,
             awayTeam: match.awayTeam.name,
@@ -33,6 +51,12 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
             cornersTotal: match.aiPrediction?.corners?.expectedCornersTotal ?? 9.5,
           }),
         });
+
+        if (res.status === 401) {
+          // La sesión expiró justo entre el check y la llamada
+          setIsLoggedIn(false);
+          return;
+        }
 
         const data = await res.json();
         setAiAnalysis(data.analysis);
@@ -111,7 +135,20 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
             </span>
           </div>
 
-          {loadingAi ? (
+          {isLoggedIn === false ? (
+            // Visitante sin sesión: CTA para registrarse en vez de gastar la cuota de IA
+            <div className="py-3 text-center space-y-2.5">
+              <p className="text-xs text-zinc-300">
+                🔒 Inicia sesión gratis para desbloquear el análisis táctico con IA de este partido.
+              </p>
+              <button
+                onClick={() => router.push('/?openAuth=true')}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition cursor-pointer active:scale-95"
+              >
+                Iniciar sesión
+              </button>
+            </div>
+          ) : loadingAi ? (
             <div className="py-3 text-center text-xs text-zinc-400 animate-pulse">
               Consultando la IA de Google para redacción táctica...
             </div>
