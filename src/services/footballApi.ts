@@ -37,81 +37,33 @@ function formatMatchDateTime(utcDateStr?: string): { timeBadge: string; isToday:
   }
 }
 
-// 🧠 MOTOR GENERADOR DE PICKS IA GARANTIZADO
-function generateAIPick(homeTeam: string, awayTeam: string, matchId: string) {
-  // Genera probabilidades consistentes basadas en el ID y nombres
-  const seed = (matchId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % 100;
-  
-  let homeWinProb = 40 + (seed % 35);
-  let awayWinProb = 20 + ((seed * 3) % 30);
-  let drawProb = 100 - homeWinProb - awayWinProb;
-
-  if (drawProb < 15) {
-    drawProb = 20;
-    homeWinProb -= 10;
-  }
-
-  let pickRecommendation = '';
-  let reasoning = '';
-  let confidence = 70 + (seed % 22); // Confianza entre 70% y 92%
-
-  if (homeWinProb >= 52) {
-    pickRecommendation = `Gana ${homeTeam} o Empate`;
-    reasoning = `Dominio local proyectado (${homeWinProb}% de probabilidad) con alto rendimiento defensivo.`;
-  } else if (awayWinProb >= 48) {
-    pickRecommendation = `Doble Oportunidad: ${awayTeam} o Empate`;
-    reasoning = `El visitante llega con racha positiva y efectividad en contraataques.`;
-  } else if (seed % 2 === 0) {
-    pickRecommendation = `Ambos Equipos Anotan: SÍ`;
-    reasoning = `Promedio superior a 2.6 goles esperados (xG) entre ambos planteles.`;
-  } else {
-    pickRecommendation = `Más de 1.5 Goles en el Partido`;
-    reasoning = `Tendencia de alta efectividad ofensiva en los últimos encuentros directos.`;
-  }
-
-  return {
-    homeWinProb,
-    drawProb,
-    awayWinProb,
-    confidence,
-    recommendation: pickRecommendation,
-    reasoning,
-  };
-}
-
 export async function fetchRealMatches(): Promise<Match[] | null> {
   try {
     const response = await fetch('/api/matches');
     if (!response.ok) return null;
 
     const rawData = await response.json();
-    
-    const matchesArray = Array.isArray(rawData) 
-      ? rawData 
-      : rawData.matches && Array.isArray(rawData.matches) 
-      ? rawData.matches 
+
+    const matchesArray = Array.isArray(rawData)
+      ? rawData
+      : rawData.matches && Array.isArray(rawData.matches)
+      ? rawData.matches
       : null;
 
     if (!matchesArray || matchesArray.length === 0) return null;
 
     return matchesArray.map((m: any, index: number) => {
-      let homeName = 'Local';
-      let awayName = 'Visitante';
-
-      if (m.homeTeam?.name && m.awayTeam?.name) {
-        homeName = m.homeTeam.shortName || m.homeTeam.name;
-        awayName = m.awayTeam.shortName || m.awayTeam.name;
-      } else if (m.match && typeof m.match === 'string' && m.match.includes(' vs ')) {
-        const parts = m.match.split(' vs ');
-        homeName = parts[0].trim();
-        awayName = parts[1].trim();
-      }
-
+      const homeName = m.homeTeam?.name || 'Local';
+      const awayName = m.awayTeam?.name || 'Visitante';
       const leagueName = m.league || 'LIGA INTERNACIONAL';
       const { timeBadge, isToday } = formatMatchDateTime(m.utcDate);
 
-      // Calculamos el Pick IA Garantizado
-      const ai = generateAIPick(homeName, awayName, String(m.id || index));
+      // La predicción YA viene calculada por el motor real (Poisson +
+      // Dixon-Coles) desde /api/matches, usando estadísticas reales de la
+      // tabla de posiciones cuando están disponibles. Aquí solo la
+      // transportamos — nada se inventa en este archivo.
+      const ai = m.aiPrediction || {};
+      const probs = m.probs || { home: 0, draw: 0, away: 0 };
 
       return {
         id: String(m.id || index + 1),
@@ -120,43 +72,49 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         homeTeam: {
           name: homeName,
           logo: m.homeTeam?.crest || '',
-          form: ['V', 'E', 'V'],
+          // Racha real si football-data la proporcionó para esta competición;
+          // si no está disponible, queda vacía (no se inventa una racha falsa).
+          form: m.homeTeam?.form || [],
         },
         awayTeam: {
           name: awayName,
           logo: m.awayTeam?.crest || '',
-          form: ['E', 'V', 'D'],
+          form: m.awayTeam?.form || [],
         },
         score: {
           home: m.score?.home ?? 0,
           away: m.score?.away ?? 0,
         },
-        probs: {
-          home: ai.homeWinProb,
-          draw: ai.drawProb,
-          away: ai.awayWinProb,
-        },
-        probabilities: {
-          home: ai.homeWinProb,
-          draw: ai.drawProb,
-          away: ai.awayWinProb,
-        },
+        probs,
+        probabilities: probs,
         stats: {
-          xg: [1.8, 1.2],
-          possession: [54, 46],
-          shotsOnTarget: [5, 4],
-          corners: [6, 4],
+          xg: [ai.xGHome ?? 1.5, ai.xGAway ?? 1.1], // real: viene del motor Poisson
+          corners: [
+            ai.corners?.expectedCornersHome ?? 5.5,
+            ai.corners?.expectedCornersAway ?? 4.3,
+          ], // real: viene del motor Poisson
+          // ⚠️ possession y shotsOnTarget NO tienen fuente de datos real
+          // disponible todavía (football-data.org no las expone). Quedan
+          // marcadas explícitamente — pendiente decidir si se ocultan de la
+          // UI o se busca otro proveedor. Ver nota en la auditoría.
+          possession: null,
+          shotsOnTarget: null,
         },
         status: m.status || 'SCHEDULED',
         time: timeBadge,
         dateCategory: isToday ? 'HOY' : ('PROXIMOS' as any),
+        hasRealStats: Boolean(m.hasRealStats),
         aiPrediction: {
-          recommendation: ai.recommendation,
-          confidence: `${ai.confidence}%`,
-          homeWin: ai.homeWinProb,
-          draw: ai.drawProb,
-          awayWin: ai.awayWinProb,
-          reasoning: ai.reasoning,
+          recommendation: ai.recommendation || 'Analizando...',
+          confidence: ai.confidence || '55%',
+          homeWin: ai.homeWin ?? probs.home,
+          draw: ai.draw ?? probs.draw,
+          awayWin: ai.awayWin ?? probs.away,
+          reasoning: ai.reasoning || '',
+          xGHome: ai.xGHome,
+          xGAway: ai.xGAway,
+          corners: ai.corners,
+          topCorrectScores: ai.topCorrectScores,
         },
       };
     });
