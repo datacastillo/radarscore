@@ -23,7 +23,10 @@ import {
   ShieldCheck, 
   Loader2,
   Calendar,
-  Filter
+  Filter,
+  UserPlus,
+  UserMinus,
+  Users
 } from 'lucide-react';
 
 interface ProfileData {
@@ -69,6 +72,13 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Estado de seguidores/seguidos
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followLoading, setFollowLoading] = useState(false);
+
   useEffect(() => {
     if (username) {
       fetchUserProfile();
@@ -104,10 +114,91 @@ export default function UserProfilePage() {
       if (ticketsError) throw ticketsError;
       setTickets(ticketsData || []);
 
+      // 3. Saber quién está viendo el perfil (para saber si puede seguir)
+      const { data: { session } } = await supabase.auth.getSession();
+      const viewerId = session?.user?.id || null;
+      setCurrentUserId(viewerId);
+
+      // 4. Contadores de seguidores / seguidos
+      const [followersRes, followingRes] = await Promise.all([
+        supabase
+          .from('follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('following_id', profileData.id),
+        supabase
+          .from('follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('follower_id', profileData.id),
+      ]);
+
+      setFollowersCount(followersRes.count || 0);
+      setFollowingCount(followingRes.count || 0);
+
+      // 5. Si hay alguien logueado viendo el perfil de otra persona, saber si ya lo sigue
+      if (viewerId && viewerId !== profileData.id) {
+        const { data: followRow } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', viewerId)
+          .eq('following_id', profileData.id)
+          .maybeSingle();
+
+        setIsFollowing(Boolean(followRow));
+      } else {
+        setIsFollowing(false);
+      }
+
     } catch (err) {
       console.error('Error al obtener perfil e historial:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    if (!profile) return;
+
+    // Sin sesión -> manda a iniciar sesión, mismo patrón que el resto de la app
+    if (!currentUserId) {
+      router.push('/?openAuth=true');
+      return;
+    }
+
+    // No te puedes seguir a ti mismo (el botón ni siquiera se muestra en ese caso,
+    // esto es solo una segunda barrera de protección)
+    if (currentUserId === profile.id) return;
+
+    setFollowLoading(true);
+    const wasFollowing = isFollowing;
+
+    // Actualización optimista para que se sienta instantáneo
+    setIsFollowing(!wasFollowing);
+    setFollowersCount(prev => (wasFollowing ? Math.max(0, prev - 1) : prev + 1));
+
+    try {
+      if (wasFollowing) {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUserId)
+          .eq('following_id', profile.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('follows')
+          .insert([{ follower_id: currentUserId, following_id: profile.id }]);
+
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Error al actualizar el seguimiento:', err);
+      // Revertir la actualización optimista si algo falló
+      setIsFollowing(wasFollowing);
+      setFollowersCount(prev => (wasFollowing ? prev + 1 : Math.max(0, prev - 1)));
+      alert('No se pudo actualizar el seguimiento. Intenta de nuevo.');
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -125,6 +216,8 @@ export default function UserProfilePage() {
     if (activeTab === 'LOSS') return t.status === 'LOSS' || t.status === 'LOST';
     return true; // ALL
   });
+
+  const isOwnProfile = currentUserId === profile?.id;
 
   if (loading) {
     return (
@@ -183,20 +276,62 @@ export default function UserProfilePage() {
             />
 
             <div className="space-y-2 flex-1">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2">
-                <h1 className="text-2xl font-black text-white flex items-center gap-2">
-                  @{profile.username}
-                  {profile.rol === 'admin' && (
-                    <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
-                      <ShieldCheck className="w-3 h-3" /> ADMIN
-                    </span>
-                  )}
-                </h1>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-black text-white flex items-center gap-2 justify-center sm:justify-start">
+                    @{profile.username}
+                    {profile.rol === 'admin' && (
+                      <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                        <ShieldCheck className="w-3 h-3" /> ADMIN
+                      </span>
+                    )}
+                  </h1>
+
+                  <p className="text-xs text-slate-400 font-medium mt-1">
+                    {profile.full_name || 'Tipster de la Comunidad'}
+                  </p>
+                </div>
+
+                {/* Botón Seguir — solo si NO es tu propio perfil */}
+                {!isOwnProfile && (
+                  <button
+                    onClick={handleFollowToggle}
+                    disabled={followLoading}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer active:scale-95 disabled:opacity-50 shrink-0 ${
+                      isFollowing
+                        ? 'bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20'
+                    }`}
+                  >
+                    {followLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : isFollowing ? (
+                      <>
+                        <UserMinus className="w-3.5 h-3.5" />
+                        <span>Siguiendo</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Seguir</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
-              <p className="text-xs text-slate-400 font-medium">
-                {profile.full_name || 'Tipster de la Comunidad'}
-              </p>
+              {/* Seguidores / Seguidos */}
+              <div className="flex items-center justify-center sm:justify-start gap-4 text-xs">
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <Users className="w-3.5 h-3.5 text-emerald-400" />
+                  <strong className="text-white font-black">{followersCount}</strong>
+                  <span className="text-slate-500">Seguidores</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <strong className="text-white font-black">{followingCount}</strong>
+                  <span className="text-slate-500">Siguiendo</span>
+                </span>
+              </div>
 
               {profile.created_at && (
                 <div className="flex items-center justify-center sm:justify-start gap-1.5 text-[11px] text-slate-500 font-mono">

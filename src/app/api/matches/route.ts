@@ -209,7 +209,10 @@ export async function GET() {
         aiPrediction: {
           recommendation: prediction.recommendedPick,
           reasoning: prediction.recommendedPickReason,
-          confidence: `${prediction.confidence}%`,
+          // Número puro, SIN el símbolo %. El componente de UI (MatchCard,
+          // MatchModal) es el único responsable de agregarlo al mostrarlo —
+          // así evitamos el bug de "85%%" por duplicar el símbolo en dos capas.
+          confidence: prediction.confidence,
           homeWin: prediction.homeWinProb,
           draw: prediction.drawProb,
           awayWin: prediction.awayWinProb,

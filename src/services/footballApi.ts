@@ -4,7 +4,7 @@ const getLeagueEmoji = (leagueName?: string): string => {
   if (!leagueName) return '⚽';
   const upper = leagueName.toUpperCase();
   if (upper.includes('PREMIER') || upper.includes('GB')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
-  if (upper.includes('LALIGA') || upper.includes('ES')) return '🇪🇸';
+  if (upper.includes('LALIGA') || upper.includes('PRIMERA') || upper.includes('ES')) return '🇪🇸';
   if (upper.includes('CHAMPIONS') || upper.includes('UEFA')) return '🇪🇺';
   if (upper.includes('SERIE A') || upper.includes('IT')) return '🇮🇹';
   if (upper.includes('LIGA MX') || upper.includes('MX')) return '🇲🇽';
@@ -106,7 +106,8 @@ export async function fetchRealMatches(): Promise<Match[] | null> {
         hasRealStats: Boolean(m.hasRealStats),
         aiPrediction: {
           recommendation: ai.recommendation || 'Analizando...',
-          confidence: ai.confidence || '55%',
+          // Número puro, sin %. Ver nota en matches_route.ts sobre por qué.
+          confidence: ai.confidence ?? 55,
           homeWin: ai.homeWin ?? probs.home,
           draw: ai.draw ?? probs.draw,
           awayWin: ai.awayWin ?? probs.away,

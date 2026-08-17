@@ -8,16 +8,25 @@ interface PickOfTheDayProps {
   onSelectMatch: (match: Match) => void;
 }
 
-// Jerarquía de Ligas para ponderar importancia
-const LIGA_PRIORITY: Record<string, number> = {
-  'Champions League': 100,
-  'Premier League': 90,
-  'LaLiga': 85,
-  'Bundesliga': 80,
-  'Serie A': 80,
-  'Eredivisie': 70,
-  'Primeira Liga': 70,
-};
+// Jerarquía de Ligas para ponderar importancia.
+// Usa coincidencia por substring en mayúsculas (mismo patrón que
+// getLeagueEmoji en footballApi.ts) porque el nombre real que entrega
+// football-data.org no siempre coincide exacto con el nombre "bonito"
+// (ej. Champions League se llama "UEFA Champions League", La Liga se
+// llama "Primera Division"), y footballApi.ts guarda la liga en
+// MAYÚSCULAS — un lookup exacto por objeto nunca hacía match.
+function getLeaguePriority(leagueName?: string): number {
+  if (!leagueName) return 50;
+  const upper = leagueName.toUpperCase();
+  if (upper.includes('CHAMPIONS')) return 100;
+  if (upper.includes('PREMIER')) return 90;
+  if (upper.includes('PRIMERA') || upper.includes('LALIGA') || upper.includes('LA LIGA')) return 85;
+  if (upper.includes('BUNDESLIGA')) return 80;
+  if (upper.includes('SERIE A')) return 80;
+  if (upper.includes('EREDIVISIE')) return 70;
+  if (upper.includes('PRIMEIRA LIGA')) return 70;
+  return 50;
+}
 
 export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayProps) {
   if (!matches || matches.length === 0) return null;
@@ -43,8 +52,8 @@ export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayPro
     const awayB = b.aiPrediction?.awayWin ?? b.probs?.away ?? 33;
     const marginB = Math.abs(homeB - awayB);
 
-    const prioA = LIGA_PRIORITY[a.league] || 50;
-    const prioB = LIGA_PRIORITY[b.league] || 50;
+    const prioA = getLeaguePriority(a.league);
+    const prioB = getLeaguePriority(b.league);
 
     const scoreA = confA * 1.5 + marginA * 0.5 + prioA;
     const scoreB = confB * 1.5 + marginB * 0.5 + prioB;

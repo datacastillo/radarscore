@@ -87,8 +87,16 @@ export default function PartidosPage() {
       const res = await fetch(`/api/standings?league=${leagueCode}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.standings && data.standings[0]?.table) {
-          setStandings(data.standings[0].table);
+        // Se filtra explícitamente por type === 'TOTAL': en competiciones
+        // con fase de grupos (ej. Champions League) la respuesta trae VARIAS
+        // tablas (una por grupo), y standings[0] podía ser cualquier grupo
+        // al azar en vez de la tabla general.
+        const totalTable = Array.isArray(data.standings)
+          ? data.standings.find((s: any) => s.type === 'TOTAL') || data.standings[0]
+          : null;
+
+        if (totalTable?.table) {
+          setStandings(totalTable.table);
         } else {
           setStandings([]);
         }
@@ -104,7 +112,9 @@ export default function PartidosPage() {
   const filteredMatches = useMemo(() => {
     return matches.filter(m => {
       if (selectedLeague === 'PL') return m.league?.includes('PREMIER') || m.flag === '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
-      if (selectedLeague === 'PD') return m.league?.includes('LALIGA') || m.flag === '🇪🇸';
+      // Football-data.org llama a La Liga "Primera Division", no "LaLiga" —
+      // se agrega ese check para que la pestaña realmente filtre partidos.
+      if (selectedLeague === 'PD') return m.league?.includes('LALIGA') || m.league?.includes('PRIMERA') || m.flag === '🇪🇸';
       if (selectedLeague === 'CL') return m.league?.includes('CHAMPIONS') || m.flag === '🇪🇺';
       if (selectedLeague === 'SA') return m.league?.includes('SERIE') || m.flag === '🇮🇹';
       if (selectedLeague === 'BL1') return m.league?.includes('BUNDESLIGA') || m.flag === '🇩🇪';
@@ -258,7 +268,9 @@ export default function PartidosPage() {
                       <div className="bg-[#06080e] border border-emerald-500/20 rounded-xl p-2.5 space-y-1">
                         <div className="flex items-center justify-between text-[10px] font-mono text-emerald-400 font-bold">
                           <span className="flex items-center gap-1"><Bot className="w-3 h-3" /> SUGERENCIA IA</span>
-                          <span>CONF. {match.aiPrediction.confidence || '85%'}</span>
+                          {/* FIX: confidence ahora es número puro (sin %), se
+                              agrega el símbolo aquí explícitamente. */}
+                          <span>CONF. {match.aiPrediction.confidence ?? 85}%</span>
                         </div>
                         <p className="text-xs font-black text-emerald-300">
                           {match.aiPrediction.recommendation}
@@ -402,7 +414,9 @@ export default function PartidosPage() {
 
                 <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                   <span className="text-slate-400">Nivel de Confianza:</span>
-                  <span className="font-mono font-bold text-amber-400">{selectedMatchForAI.aiPrediction.confidence || '85%'}</span>
+                  {/* FIX: se agrega el símbolo % explícitamente (confidence
+                      ahora viaja como número puro) */}
+                  <span className="font-mono font-bold text-amber-400">{selectedMatchForAI.aiPrediction.confidence ?? 85}%</span>
                 </div>
 
                 {selectedMatchForAI.aiPrediction.reasoning && (
