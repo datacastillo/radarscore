@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import InfoTooltip from '@/components/InfoTooltip';
 import { 
   Trophy, 
   TrendingUp, 
@@ -382,11 +383,20 @@ export default function RankingPage() {
                     <tr className="border-b border-slate-800/80 text-slate-500 font-mono text-[10px] uppercase bg-[#06080e]/50">
                       <th className="py-3 px-4 text-center">Pos</th>
                       <th className="py-3 px-4">Tipster</th>
-                      <th className="py-3 px-4 text-center">Picks</th>
-                      <th className="py-3 px-4 text-center">Win Rate %</th>
-                      <th className="py-3 px-4 text-center">Yield %</th>
-                      <th className="py-3 px-4 text-right">Profit Est.</th>
-                      <th className="py-3 px-4 text-center">Acción</th>
+                      <th className="py-3 px-2 text-center">Picks</th>
+                      <th className="py-3 px-2 text-center">
+                        <span className="inline-flex items-center gap-1">
+                          Win Rate %
+                          <InfoTooltip text="Porcentaje de picks ganadores, sin importar el monto apostado en cada uno." side="bottom" />
+                        </span>
+                      </th>
+                      <th className="py-3 px-2 text-center">
+                        <span className="inline-flex items-center gap-1">
+                          Yield %
+                          <InfoTooltip text="Rendimiento sobre el total apostado. Mide qué tan rentables son los picks, no solo cuántos se aciertan." side="bottom" />
+                        </span>
+                      </th>
+                      <th className="py-3 px-4 text-right font-bold text-emerald-400">PTS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">

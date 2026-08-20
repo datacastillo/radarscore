@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Match } from '@/data/mockMatches';
+import InfoTooltip from '@/components/InfoTooltip';
 
 interface MatchCardProps {
   match: Match;
@@ -51,8 +52,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect }) => {
         </div>
 
         {match.aiPrediction?.confidence && (
-          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span
+            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+            onClick={(e) => e.stopPropagation()}
+          >
             🤖 IA Confianza: {match.aiPrediction.confidence}%
+            <InfoTooltip text="Qué tan clara es la ventaja de un equipo sobre el otro según el modelo. No es una garantía de resultado." side="bottom" />
           </span>
         )}
       </div>

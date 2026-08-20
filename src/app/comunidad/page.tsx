@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
 import CreatePickModal from '@/components/CreatePickModal';
+import InfoTooltip from '@/components/InfoTooltip';
 import { fetchRealMatches } from '@/services/footballApi';
 import { Match, MOCK_MATCHES } from '@/data/mockMatches';
 import { 
@@ -751,6 +752,7 @@ export default function ComunidadPage() {
                     {isDreamer && (
                       <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
                         <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                        <InfoTooltip text="Pick con cuota @10.00 o más (equivalente a +900 en momio americano) — alto riesgo, alta recompensa." side="bottom" />
                       </span>
                     )}
 

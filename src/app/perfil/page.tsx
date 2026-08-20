@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
+import InfoTooltip from '@/components/InfoTooltip';
 import { 
   User, 
   ShieldCheck, 
@@ -49,7 +50,7 @@ interface Ticket {
   comment?: string;
   image_url?: string;
   is_dreamer?: boolean;
-  status: 'PENDING' | 'WON' | 'LOST' | 'WIN' | 'LOSS' | string;
+  status: 'PENDING' | 'WIN' | 'LOSS' | 'VOID' | string;
   created_at: string;
 }
 
@@ -95,10 +96,7 @@ export default function MiPerfilPage() {
 
       if (!profileError && profileData) {
         setProfile(profileData);
-        setFullName(profileData.full_name || '');
-        setUsername(profileData.username || '');
-        setAvatarUrl(profileData.avatar_url || '');
-        setBio(profileData.bio || '');
+        syncFormFieldsFromProfile(profileData);
       }
 
       const { data: ticketsData } = await supabase
@@ -116,13 +114,44 @@ export default function MiPerfilPage() {
     }
   };
 
+  // Sincroniza el formulario de edición con los valores reales del perfil.
+  // Se usa al cargar Y al abrir/cancelar la edición, para que nunca queden
+  // cambios sin guardar "pegados" en el formulario de una sesión anterior.
+  const syncFormFieldsFromProfile = (p: Profile) => {
+    setFullName(p.full_name || '');
+    setUsername(p.username || '');
+    setAvatarUrl(p.avatar_url || '');
+    setBio(p.bio || '');
+  };
+
+  const openEditForm = () => {
+    if (profile) syncFormFieldsFromProfile(profile);
+    setIsEditing(true);
+  };
+
+  const cancelEditForm = () => {
+    if (profile) syncFormFieldsFromProfile(profile);
+    setIsEditing(false);
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
 
     setSaving(true);
     try {
-      const cleanUsername = username.trim().toLowerCase().replace(/\s+/g, '_');
+      // Mismo sanitizado que AuthModal.tsx al registrarse: solo minúsculas,
+      // números y guion bajo — antes esta pantalla era más permisiva y
+      // permitía colar símbolos que nunca se hubieran aceptado al crear
+      // la cuenta.
+      const cleanUsername = username
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '');
+
+      if (!cleanUsername) {
+        throw new Error('El nombre de usuario no puede quedar vacío o solo con símbolos.');
+      }
 
       const { error } = await supabase
         .from('profiles')
@@ -146,7 +175,14 @@ export default function MiPerfilPage() {
 
       setIsEditing(false);
     } catch (err: any) {
-      alert('Error al actualizar el perfil: ' + (err.message || err));
+      // El username tiene una restricción UNIQUE en la base de datos —
+      // si alguien ya lo tomó, este mensaje lo refleja.
+      const isDuplicate = err?.message?.toLowerCase().includes('duplicate') || err?.code === '23505';
+      alert(
+        isDuplicate
+          ? 'Ese nombre de usuario ya lo tiene alguien más. Prueba con otro.'
+          : 'Error al actualizar el perfil: ' + (err.message || err)
+      );
     } finally {
       setSaving(false);
     }
@@ -202,48 +238,28 @@ export default function MiPerfilPage() {
     );
   }
 
-  const isPending = (st: string) => st?.toUpperCase() === 'PENDING';
-  const isWon = (st: string) => st?.toUpperCase() === 'WON' || st?.toUpperCase() === 'WIN';
-  const isLost = (st: string) => st?.toUpperCase() === 'LOST' || st?.toUpperCase() === 'LOSS';
+  // Estados PENDING/WIN/LOSS/VOID ya son los únicos valores válidos gracias
+  // al CHECK constraint de la base de datos — sin variantes viejas que
+  // contemplar.
+  const isPending = (st: string) => st === 'PENDING';
+  const isWon = (st: string) => st === 'WIN';
+  const isLost = (st: string) => st === 'LOSS';
 
   const pendingTickets = tickets.filter(t => isPending(t.status));
   const historyTickets = tickets.filter(t => !isPending(t.status));
   const wonTickets = tickets.filter(t => isWon(t.status)).length;
   const lostTickets = tickets.filter(t => isLost(t.status)).length;
 
-  const eligibleYieldTickets = historyTickets.filter(t => (t.odds || 0) < 10.0 && !t.is_dreamer);
-  
-  let totalStakedYield = 0;
-  let totalReturnedYield = 0;
-
-  eligibleYieldTickets.forEach(t => {
-    const stake = t.stake || 100;
-    totalStakedYield += stake;
-    if (isWon(t.status)) {
-      totalReturnedYield += t.potential_payout || (stake * t.odds);
-    }
-  });
-
-  const calculatedProfitYield = totalReturnedYield - totalStakedYield;
-  const calculatedYieldRate = totalStakedYield > 0 ? (calculatedProfitYield / totalStakedYield) * 100 : 0;
-  
-  const eligibleWonCount = eligibleYieldTickets.filter(t => isWon(t.status)).length;
-  const calculatedWinRate = eligibleYieldTickets.length > 0 ? (eligibleWonCount / eligibleYieldTickets.length) * 100 : 0;
-
-  const displayYield = eligibleYieldTickets.length > 0 ? calculatedYieldRate.toFixed(2) : (profile.yield_rate || 0);
-  const displayWinRate = eligibleYieldTickets.length > 0 ? calculatedWinRate.toFixed(1) : (profile.win_rate || 0);
-
-  let globalNetProfit = 0;
-  historyTickets.forEach(t => {
-    const stake = t.stake || 100;
-    if (isWon(t.status)) {
-      globalNetProfit += (t.potential_payout || (stake * t.odds)) - stake;
-    } else if (isLost(t.status)) {
-      globalNetProfit -= stake;
-    }
-  });
-
-  const displayTotalProfit = historyTickets.length > 0 ? globalNetProfit.toFixed(2) : (profile.total_profit || 0);
+  // Yield %, Win Rate % y Ganancia Neta se muestran DIRECTO del perfil —
+  // los mismos valores que calcula recalculate_user_stats() y que ven
+  // los demás usuarios en /perfil/[username] y /ranking. Antes esta
+  // página los recalculaba aquí con una fórmula ligeramente distinta
+  // (excluía picks SOÑADOR del Win Rate, cosa que el cálculo del servidor
+  // no hace), lo que podía mostrar un número diferente al que ve el resto
+  // de la comunidad para el mismo usuario.
+  const displayYield = profile.yield_rate ?? 0;
+  const displayWinRate = profile.win_rate ?? 0;
+  const displayTotalProfit = profile.total_profit ?? 0;
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white py-8 px-4 sm:px-6 lg:px-8">
@@ -260,7 +276,7 @@ export default function MiPerfilPage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setIsEditing(false)}
+                  onClick={cancelEditForm}
                   className="text-gray-400 hover:text-white p-1 rounded-lg bg-gray-800/50 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -325,7 +341,7 @@ export default function MiPerfilPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsEditing(false)}
+                  onClick={cancelEditForm}
                   className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-2.5 rounded-xl transition text-xs cursor-pointer"
                 >
                   Cancelar
@@ -361,7 +377,7 @@ export default function MiPerfilPage() {
 
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={openEditForm}
                   className="flex-1 sm:flex-initial bg-[#0B0E14] hover:bg-gray-800 text-gray-300 border border-gray-800 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Edit3 className="w-4 h-4 text-emerald-400" />
@@ -401,6 +417,7 @@ export default function MiPerfilPage() {
             <div className="bg-[#0B0E14] border border-gray-800/80 p-3.5 rounded-2xl text-center space-y-0.5">
               <span className="text-[11px] text-gray-400 font-bold flex items-center justify-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Yield %
+                <InfoTooltip text="Rendimiento sobre el total apostado. Mide qué tan rentables son tus picks, no solo cuántos aciertas." side="bottom" />
               </span>
               <span className={`text-xl font-black ${Number(displayYield) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
                 {Number(displayYield) > 0 ? `+${displayYield}` : displayYield}%
@@ -410,6 +427,7 @@ export default function MiPerfilPage() {
             <div className="bg-[#0B0E14] border border-gray-800/80 p-3.5 rounded-2xl text-center space-y-0.5">
               <span className="text-[11px] text-gray-400 font-bold flex items-center justify-center gap-1">
                 <Target className="w-3.5 h-3.5 text-amber-400" /> Win Rate
+                <InfoTooltip text="Porcentaje de picks ganadores, sin importar el monto apostado en cada uno." side="bottom" />
               </span>
               <span className="text-xl font-black text-amber-400">
                 {displayWinRate}%
@@ -484,6 +502,7 @@ export default function MiPerfilPage() {
                             {isDreamer && (
                               <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
                                 <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                                <InfoTooltip text="Pick con cuota @10.00 o más — no cuenta para el cálculo del Yield." side="bottom" />
                               </span>
                             )}
                           </div>
@@ -522,6 +541,7 @@ export default function MiPerfilPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {historyTickets.map(ticket => {
                   const win = isWon(ticket.status);
+                  const isVoidTicket = ticket.status === 'VOID';
                   const isDreamer = ticket.is_dreamer || ticket.odds >= 10.0;
                   const profitVal = win 
                     ? ((ticket.potential_payout || (ticket.stake * ticket.odds)) - ticket.stake) 
@@ -538,7 +558,11 @@ export default function MiPerfilPage() {
                             </span>
                           )}
                         </div>
-                        {win ? (
+                        {isVoidTicket ? (
+                          <span className="bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                            NULO / REEMBOLSO
+                          </span>
+                        ) : win ? (
                           <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> GANADO
                           </span>
@@ -551,9 +575,11 @@ export default function MiPerfilPage() {
 
                       <div className="flex justify-between text-xs bg-[#0B0E14] p-2.5 rounded-xl border border-gray-800/60">
                         <span className="text-gray-300 font-semibold">{ticket.selection} (@{ticket.odds})</span>
-                        <span className={win ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>
-                          {win ? `+$${profitVal.toFixed(2)} MXN` : `-$${profitVal.toFixed(2)} MXN`}
-                        </span>
+                        {!isVoidTicket && (
+                          <span className={win ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>
+                            {win ? `+$${profitVal.toFixed(2)} MXN` : `-$${profitVal.toFixed(2)} MXN`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

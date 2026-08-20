@@ -28,6 +28,7 @@ import {
   UserMinus,
   Users
 } from 'lucide-react';
+import InfoTooltip from '@/components/InfoTooltip';
 
 interface ProfileData {
   id: string;
@@ -348,7 +349,10 @@ export default function UserProfilePage() {
             {/* Yield % */}
             <div className="bg-[#06080e] border border-slate-800/80 p-4 rounded-2xl space-y-1">
               <div className="flex items-center justify-between text-slate-500 text-[10px] font-mono font-bold">
-                <span>YIELD %</span>
+                <span className="flex items-center gap-1">
+                  YIELD %
+                  <InfoTooltip text="Rendimiento sobre el total apostado. Si en total apostaste $100 y terminaste ganando $110 (contando pérdidas y ganancias), tu yield es +10%. Mide qué tan rentables son tus picks, no solo cuántos aciertas." />
+                </span>
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <p className={`text-xl font-black font-mono ${
@@ -361,7 +365,10 @@ export default function UserProfilePage() {
             {/* Win Rate % */}
             <div className="bg-[#06080e] border border-slate-800/80 p-4 rounded-2xl space-y-1">
               <div className="flex items-center justify-between text-slate-500 text-[10px] font-mono font-bold">
-                <span>WIN RATE %</span>
+                <span className="flex items-center gap-1">
+                  WIN RATE %
+                  <InfoTooltip text="Porcentaje de picks que resultaron ganadores, sin importar el monto apostado en cada uno. Un win rate alto no siempre significa buen rendimiento — mira el Yield % también." />
+                </span>
                 <Target className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <p className="text-xl font-black text-white font-mono">
@@ -542,6 +549,7 @@ export default function UserProfilePage() {
                           {isDreamerTicket && (
                             <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                               <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                              <InfoTooltip text="Pick con cuota @10.00 o más (equivalente a +900 en momio americano) — una apuesta de alto riesgo y alta recompensa. Por su volatilidad, no cuenta para el cálculo del Yield %." />
                             </span>
                           )}
                           <span className="text-[10px] text-slate-500 font-mono">

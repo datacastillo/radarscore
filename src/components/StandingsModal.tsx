@@ -38,9 +38,15 @@ export default function StandingsModal({ leagueName, onClose }: StandingsModalPr
         const res = await fetch(`/api/standings?league=${leagueCode}`);
         if (!res.ok) throw new Error('Error al cargar la tabla');
         const data = await res.json();
-        
-        if (data.standings && data.standings.length > 0) {
-          setTable(data.standings[0].table || []);
+
+        // FIX: se filtra explícitamente por type === 'TOTAL'. En competiciones
+        // con fase de grupos (ej. Champions League) la respuesta trae VARIAS
+        // tablas (una por grupo), y standings[0] podía ser cualquier grupo al
+        // azar en vez de la tabla general — mismo fix ya aplicado en
+        // partidos/page.tsx y matches_route.ts, por consistencia.
+        if (Array.isArray(data.standings) && data.standings.length > 0) {
+          const totalTable = data.standings.find((s: any) => s.type === 'TOTAL') || data.standings[0];
+          setTable(totalTable?.table || []);
         } else {
           setTable([]);
         }

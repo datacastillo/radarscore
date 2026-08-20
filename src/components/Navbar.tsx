@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
+import NotificationBell from '@/components/NotificationBell';
 import { 
   Users, 
   Trophy, 
@@ -12,7 +13,8 @@ import {
   User, 
   LogOut, 
   Zap,
-  LogIn
+  LogIn,
+  Calendar
 } from 'lucide-react';
 
 function NavbarContent() {
@@ -87,7 +89,11 @@ function NavbarContent() {
     }
   };
 
+  // FIX: se agrega "Partidos" — antes no existía ningún link de navegación
+  // hacia /partidos, así que esa página (predicciones IA, Pick del Día,
+  // tabla de posiciones) era inalcanzable salvo escribiendo la URL a mano.
   const navLinks = [
+    { name: 'Partidos', href: '/partidos', icon: Calendar },
     { name: 'Comunidad', href: '/comunidad', icon: Users },
     { name: 'Ranking', href: '/ranking', icon: Trophy },
   ];
@@ -118,7 +124,7 @@ function NavbarContent() {
           </Link>
 
           {/* Links Navegación Central (Iconos en celular, Texto completo en PC) */}
-          <nav className="flex items-center gap-0.5 sm:gap-1 bg-[#0c0f17] p-1 rounded-2xl border border-gray-800 shrink-0">
+          <nav className="flex items-center gap-0.5 sm:gap-1 bg-[#0c0f17] p-1 rounded-2xl border border-gray-800 shrink-0 overflow-x-auto">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
@@ -127,7 +133,7 @@ function NavbarContent() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 sm:gap-1.5 whitespace-nowrap ${
+                  className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
                       : 'text-gray-400 hover:text-white'
@@ -144,6 +150,8 @@ function NavbarContent() {
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {currentUser && userProfile ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
+                <NotificationBell />
+
                 <Link
                   href={`/perfil/${userProfile.username || 'usuario'}`}
                   className="flex items-center gap-1.5 sm:gap-2 bg-[#0c0f17] hover:bg-gray-800 border border-gray-800 p-1 sm:p-1.5 sm:pr-3 rounded-2xl transition"

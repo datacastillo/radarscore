@@ -17,7 +17,8 @@ import {
   Camera,
   Upload,
   Rocket,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 
 interface CreatePickModalProps {
@@ -34,6 +35,11 @@ const POPULAR_LEAGUES = [
   'Serie A',
   'MLS'
 ];
+
+// Límites de validación de imagen — deben coincidir con el bucket de Supabase Storage
+const MAX_IMAGE_SIZE_MB = 5;
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 // 🧠 FUNCIÓN DE CONVERSIÓN DE MOMIOS (+ / - / Decimal)
 function parseOddsInput(input: string): { decimal: number; isDreamer: boolean } {
@@ -78,6 +84,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
   // Estados para imagen/captura de pantalla
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -102,6 +109,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
     setCustomLeague('');
     setImageFile(null);
     setImagePreview(null);
+    setImageError(null);
   };
 
   const handleClose = () => {
@@ -111,14 +119,30 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setImageError(null);
+
+    // Validar tipo de archivo: solo imágenes reales, nada de PDFs, ejecutables, etc.
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Solo se permiten imágenes JPG, PNG, WEBP o GIF.');
+      e.target.value = ''; // limpia el input para poder reintentar con el mismo archivo si corrige
+      return;
     }
+
+    // Validar tamaño: evita subir archivos gigantes que consuman tu almacenamiento
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setImageError(`La imagen no puede pesar más de ${MAX_IMAGE_SIZE_MB}MB.`);
+      e.target.value = '';
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -392,7 +416,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
             <div className="border border-dashed border-gray-800 hover:border-emerald-500/50 rounded-2xl p-2.5 bg-[#161C26] text-center cursor-pointer transition relative">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 onChange={handleFileChange}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
               />
@@ -401,7 +425,7 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                   <img src={imagePreview} alt="Preview" className="max-h-32 rounded-xl border border-gray-800 mx-auto object-contain" />
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                    onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); setImageError(null); }}
                     className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 transition z-20 cursor-pointer"
                   >
                     <X className="w-3 h-3" />
@@ -414,6 +438,15 @@ export default function CreatePickModal({ isOpen, onClose, onSuccess }: CreatePi
                 </div>
               )}
             </div>
+            <p className="text-[10px] text-gray-500 px-1">
+              JPG, PNG, WEBP o GIF · Máximo {MAX_IMAGE_SIZE_MB}MB
+            </p>
+            {imageError && (
+              <div className="flex items-center gap-1.5 text-[11px] text-rose-400 font-semibold px-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{imageError}</span>
+              </div>
+            )}
           </div>
 
           {/* Justificación */}

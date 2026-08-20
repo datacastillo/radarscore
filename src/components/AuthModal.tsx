@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   Zap,
-  ArrowRight
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -39,6 +40,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   if (!isOpen) return null;
 
@@ -51,6 +53,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     setSuccessMsg(null);
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setAcceptedTerms(false);
   };
 
   // Inicio de Sesión con Google OAuth
@@ -61,7 +64,11 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/comunidad`,
+          // Antes iba directo a /comunidad, saltándose por completo el
+          // checkbox de edad/términos que sí ven los usuarios de correo.
+          // Ahora pasa por /auth/callback, que verifica si ya aceptó y,
+          // si no, se lo pide antes de continuar.
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
@@ -100,6 +107,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           throw new Error('La contraseña debe tener al menos 6 caracteres.');
         }
 
+        if (!acceptedTerms) {
+          throw new Error('Debes confirmar que eres mayor de edad y aceptar los Términos de Servicio para registrarte.');
+        }
+
         const cleanUsername = (username || email.split('@')[0])
           .trim()
           .toLowerCase()
@@ -114,7 +125,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           ? `${window.location.origin}/auth/callback` 
           : undefined;
 
-        // Registro de usuario en Supabase Auth
+        // Registro de usuario en Supabase Auth.
+        // El perfil (profiles) se crea automáticamente del lado del servidor
+        // por el trigger handle_new_user() en cuanto se inserta el usuario
+        // en auth.users — lee username/full_name/avatar_url de esta misma
+        // metadata. No hace falta (ni conviene) que el cliente intente
+        // crear/actualizar la fila de profiles por su cuenta: ahora está
+        // bloqueado por las políticas de columna que protegen esa tabla.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -134,27 +151,21 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           throw new Error('Este correo electrónico ya está registrado. Por favor, inicia sesión.');
         }
 
-        // Crear/Asegurar registro en la tabla de perfiles
-        if (data.user) {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            username: cleanUsername,
-            full_name: cleanUsername,
-            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
-            total_picks: 0,
-            win_rate: 0,
-            yield_rate: 0,
-            total_profit: 0,
-            rol: 'user'
-          });
-        }
-
         // Si requiere confirmación por correo (session = null)
         if (data.user && !data.session) {
           setSuccessMsg(
             `¡Cuenta registrada! Hemos enviado un correo de verificación a ${email}. Por favor revisa tu bandeja de entrada o SPAM y haz clic en el enlace para activar tu cuenta.`
           );
         } else {
+          // Sesión establecida de inmediato (sin confirmación de correo
+          // requerida): el checkbox de términos ya se validó arriba antes
+          // de llegar aquí, así que registramos la aceptación ahora.
+          if (data.user) {
+            await supabase
+              .from('profiles')
+              .update({ terms_accepted_at: new Date().toISOString() })
+              .eq('id', data.user.id);
+          }
           if (onSuccess) onSuccess();
           onClose();
         }
@@ -380,10 +391,35 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 </div>
               )}
 
+              {/* Checkbox obligatorio: mayoría de edad + Términos + Juego Responsable
+                  (solo en registro) */}
+              {!isLogin && (
+                <label className="flex items-start gap-2.5 bg-[#07090E] border border-gray-800 rounded-xl p-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 rounded bg-[#0c0f17] border-gray-700 text-emerald-500 focus:ring-0 cursor-pointer w-4 h-4 shrink-0"
+                  />
+                  <span className="text-[11px] text-gray-400 leading-relaxed">
+                    Confirmo que soy <strong className="text-gray-200">mayor de 18 años</strong> y acepto los{' '}
+                    <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">
+                      Términos de Servicio
+                    </a>{' '}
+                    y el{' '}
+                    <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">
+                      Aviso de Privacidad
+                    </a>
+                    . Entiendo que el contenido de esta plataforma es informativo y que debo{' '}
+                    <span className="text-amber-400 font-bold">jugar con responsabilidad</span>.
+                  </span>
+                </label>
+              )}
+
               {/* Botón de Enviar */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (!isLogin && !acceptedTerms)}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 active:scale-95 mt-2 cursor-pointer"
               >
                 {loading ? (

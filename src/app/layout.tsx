@@ -39,6 +39,15 @@ export default function RootLayout({
           {children}
         </main>
 
+        {/* Disclaimer global de juego responsable — visible en TODA la app,
+            no solo en el landing. pb-20 en móvil para no quedar tapado por
+            la barra de navegación inferior. */}
+        <footer className="border-t border-gray-800/60 py-3 px-4 text-center pb-20 md:pb-3">
+          <p className="text-[10px] text-gray-600">
+            Juega con responsabilidad (+18). Las decisiones finales son responsabilidad del usuario.
+          </p>
+        </footer>
+
       </body>
     </html>
   );

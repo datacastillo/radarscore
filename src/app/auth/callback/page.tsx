@@ -3,15 +3,58 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Loader2, BrainCircuit, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, BrainCircuit, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+
+type Status = 'loading' | 'success' | 'error' | 'needs_terms';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
+
+    const finishLogin = () => {
+      if (!isMounted) return;
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/comunidad');
+      }, 1500);
+    };
+
+    // Revisa si el usuario ya aceptó Términos/Privacidad/edad. Los usuarios
+    // que se registraron por correo ya lo aceptaron en AuthModal antes de
+    // registrarse (y AuthModal ya marcó terms_accepted_at). Los que entran
+    // por primera vez vía Google nunca vieron ese checkbox, así que se les
+    // pide aquí, una sola vez.
+    const checkTermsAndProceed = async (userId: string) => {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('terms_accepted_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (profileError) {
+        // Si no se pudo verificar, por seguridad pedimos el checkpoint
+        // en vez de dejar pasar sin confirmar.
+        setPendingUserId(userId);
+        setStatus('needs_terms');
+        return;
+      }
+
+      if (profile?.terms_accepted_at) {
+        finishLogin();
+      } else {
+        setPendingUserId(userId);
+        setStatus('needs_terms');
+      }
+    };
 
     const handleEmailConfirmation = async () => {
       try {
@@ -36,11 +79,8 @@ export default function AuthCallbackPage() {
 
         // 3. Escuchar evento de inicio de sesión de Supabase
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-          if ((event === 'SIGNED_IN' || session) && isMounted) {
-            setStatus('success');
-            setTimeout(() => {
-              router.push('/comunidad');
-            }, 1500);
+          if ((event === 'SIGNED_IN' || session) && isMounted && session?.user) {
+            checkTermsAndProceed(session.user.id);
           }
         });
 
@@ -48,11 +88,8 @@ export default function AuthCallbackPage() {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
 
-        if (session && isMounted) {
-          setStatus('success');
-          setTimeout(() => {
-            router.push('/comunidad');
-          }, 1500);
+        if (session?.user && isMounted) {
+          await checkTermsAndProceed(session.user.id);
         }
 
         return () => {
@@ -72,6 +109,30 @@ export default function AuthCallbackPage() {
       isMounted = false;
     };
   }, [router]);
+
+  const handleAcceptTerms = async () => {
+    if (!acceptedTerms || !pendingUserId) return;
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ terms_accepted_at: new Date().toISOString() })
+        .eq('id', pendingUserId);
+
+      if (error) throw error;
+
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/comunidad');
+      }, 1200);
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMessage(err?.message || 'No se pudo confirmar tu aceptación. Intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#07090E] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -98,6 +159,51 @@ export default function AuthCallbackPage() {
             <div className="flex justify-center pt-2">
               <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
             </div>
+          </>
+        )}
+
+        {/* ESTADO: FALTA ACEPTAR TÉRMINOS (típico de primer login con Google) */}
+        {status === 'needs_terms' && (
+          <>
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto shadow-lg shadow-emerald-500/20">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1 text-left sm:text-center">
+              <h2 className="text-xl font-black text-white">Un último paso</h2>
+              <p className="text-xs text-gray-400">
+                Antes de continuar, confirma lo siguiente:
+              </p>
+            </div>
+
+            <label className="flex items-start gap-2.5 bg-[#07090E] border border-gray-800 rounded-xl p-3 cursor-pointer select-none text-left">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 rounded bg-[#0c0f17] border-gray-700 text-emerald-500 focus:ring-0 cursor-pointer w-4 h-4 shrink-0"
+              />
+              <span className="text-[11px] text-gray-400 leading-relaxed">
+                Confirmo que soy <strong className="text-gray-200">mayor de 18 años</strong> y acepto los{' '}
+                <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">
+                  Términos de Servicio
+                </a>{' '}
+                y el{' '}
+                <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">
+                  Aviso de Privacidad
+                </a>
+                . Entiendo que el contenido de esta plataforma es informativo y que debo{' '}
+                <span className="text-amber-400 font-bold">jugar con responsabilidad</span>.
+              </span>
+            </label>
+
+            <button
+              onClick={handleAcceptTerms}
+              disabled={!acceptedTerms || submitting}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl transition text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Continuar a RadarScore</span>}
+            </button>
           </>
         )}
 

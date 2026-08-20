@@ -4,15 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { fetchRealMatches } from '@/services/footballApi';
 import { Match } from '@/data/mockMatches';
+import MatchCard from '@/components/MatchCard';
+import MatchModal from '@/components/MatchModal';
+import PickOfTheDay from '@/components/PickOfTheDay';
 import { 
   Bot, 
   Trophy, 
   Calendar, 
-  ChevronRight, 
-  Sparkles, 
   Loader2, 
-  TrendingUp, 
-  Target, 
   Share2,
   ArrowUpRight,
   ShieldAlert,
@@ -48,15 +47,12 @@ export default function PartidosPage() {
   const [selectedLeague, setSelectedLeague] = useState('PL');
   const [activeTab, setActiveTab] = useState<'matches' | 'standings'>('matches');
 
-  // Estados de Partidos
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
 
-  // Estados de Tabla de Posiciones
   const [standings, setStandings] = useState<StandingTeam[]>([]);
   const [loadingStandings, setLoadingStandings] = useState(false);
 
-  // Match seleccionado para Modal de Análisis IA Profundo
   const [selectedMatchForAI, setSelectedMatchForAI] = useState<Match | null>(null);
 
   useEffect(() => {
@@ -112,8 +108,7 @@ export default function PartidosPage() {
   const filteredMatches = useMemo(() => {
     return matches.filter(m => {
       if (selectedLeague === 'PL') return m.league?.includes('PREMIER') || m.flag === '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
-      // Football-data.org llama a La Liga "Primera Division", no "LaLiga" —
-      // se agrega ese check para que la pestaña realmente filtre partidos.
+      // Football-data.org llama a La Liga "Primera Division", no "LaLiga".
       if (selectedLeague === 'PD') return m.league?.includes('LALIGA') || m.league?.includes('PRIMERA') || m.flag === '🇪🇸';
       if (selectedLeague === 'CL') return m.league?.includes('CHAMPIONS') || m.flag === '🇪🇺';
       if (selectedLeague === 'SA') return m.league?.includes('SERIE') || m.flag === '🇮🇹';
@@ -217,89 +212,36 @@ export default function PartidosPage() {
                   <div key={i} className="h-44 bg-[#0c0f17] border border-slate-800 rounded-2xl animate-pulse" />
                 ))}
               </div>
-            ) : filteredMatches.length === 0 ? (
-              <div className="bg-[#0c0f17] border border-slate-800/80 rounded-2xl p-10 text-center space-y-2">
-                <BarChart3 className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-400">No hay partidos agendados hoy para {currentLeagueObj.name}.</p>
-              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredMatches.map(match => (
-                  <div
-                    key={match.id}
-                    className="bg-[#0c0f17] border border-slate-800 hover:border-emerald-500/40 transition rounded-2xl p-4 space-y-3 shadow-md flex flex-col justify-between"
-                  >
-                    {/* Header Tarjeta */}
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 border-b border-slate-800/80 pb-2">
-                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                        <span>{match.flag}</span>
-                        <span className="truncate max-w-[140px]">{match.league}</span>
-                      </span>
-                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold">
-                        {match.time}
-                      </span>
-                    </div>
+              <>
+                {/* Pick del Día — destaca el mejor partido de TODA la cartelera,
+                    sin importar la liga seleccionada arriba */}
+                {matches.length > 0 && (
+                  <PickOfTheDay matches={matches} onSelectMatch={setSelectedMatchForAI} />
+                )}
 
-                    {/* Enfrentamiento */}
-                    <div className="py-1 space-y-2">
-                      <div className="flex items-center justify-between font-bold text-sm text-slate-100">
-                        <div className="flex items-center gap-2.5">
-                          {match.homeTeam.logo ? (
-                            <img src={match.homeTeam.logo} alt="" className="w-5 h-5 object-contain" />
-                          ) : <span>⚽</span>}
-                          <span>{match.homeTeam.name}</span>
-                        </div>
-                        <span className="font-mono text-xs text-emerald-400">{match.probs?.home ? `${match.probs.home}%` : ''}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between font-bold text-sm text-slate-100">
-                        <div className="flex items-center gap-2.5">
-                          {match.awayTeam.logo ? (
-                            <img src={match.awayTeam.logo} alt="" className="w-5 h-5 object-contain" />
-                          ) : <span>⚽</span>}
-                          <span>{match.awayTeam.name}</span>
-                        </div>
-                        <span className="font-mono text-xs text-slate-400">{match.probs?.away ? `${match.probs.away}%` : ''}</span>
-                      </div>
-                    </div>
-
-                    {/* Resumen IA Gemini */}
-                    {match.aiPrediction && (
-                      <div className="bg-[#06080e] border border-emerald-500/20 rounded-xl p-2.5 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-mono text-emerald-400 font-bold">
-                          <span className="flex items-center gap-1"><Bot className="w-3 h-3" /> SUGERENCIA IA</span>
-                          {/* FIX: confidence ahora es número puro (sin %), se
-                              agrega el símbolo aquí explícitamente. */}
-                          <span>CONF. {match.aiPrediction.confidence ?? 85}%</span>
-                        </div>
-                        <p className="text-xs font-black text-emerald-300">
-                          {match.aiPrediction.recommendation}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Acciones */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => setSelectedMatchForAI(match)}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Ver Análisis Poisson</span>
-                      </button>
-
-                      <Link
-                        href="/comunidad"
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs px-3 py-2 rounded-xl transition flex items-center justify-center cursor-pointer shadow-md shadow-emerald-500/20"
-                        title="Publicar este pick"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-
+                {filteredMatches.length === 0 ? (
+                  <div className="bg-[#0c0f17] border border-slate-800/80 rounded-2xl p-10 text-center space-y-2">
+                    <BarChart3 className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="text-xs text-slate-400">No hay partidos agendados hoy para {currentLeagueObj.name}.</p>
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredMatches.map(match => (
+                      <div key={match.id} className="space-y-2">
+                        <MatchCard match={match} onSelect={setSelectedMatchForAI} />
+                        <Link
+                          href="/comunidad"
+                          className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer border border-slate-800"
+                        >
+                          <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Publicar este pick en Comunidad</span>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -375,71 +317,10 @@ export default function PartidosPage() {
 
       </main>
 
-      {/* MODAL DE ANÁLISIS POISSON DE IA EN PROFUNDIDAD */}
+      {/* MODAL DE ANÁLISIS DE IA — componente compartido, ya blindado
+          (requiere sesión, sanitiza inputs, rate-limit) */}
       {selectedMatchForAI && (
-        <div 
-          onClick={() => setSelectedMatchForAI(null)}
-          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-[#0c0f17] border border-emerald-500/30 max-w-md w-full rounded-3xl p-5 space-y-4 shadow-2xl relative text-white"
-          >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-400">
-                <Bot className="w-4 h-4" />
-                <span>Análisis Científico Gemini</span>
-              </div>
-              <button 
-                onClick={() => setSelectedMatchForAI(null)}
-                className="text-slate-400 hover:text-white text-xs font-bold bg-slate-800 px-2 py-1 rounded-lg"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            <div className="text-center space-y-1">
-              <span className="text-[10px] font-mono text-slate-400">{selectedMatchForAI.league}</span>
-              <h3 className="text-base font-black text-white">
-                {selectedMatchForAI.homeTeam.name} vs {selectedMatchForAI.awayTeam.name}
-              </h3>
-            </div>
-
-            {selectedMatchForAI.aiPrediction && (
-              <div className="space-y-3 bg-[#06080e] p-3.5 rounded-2xl border border-slate-800 text-xs">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <span className="text-slate-400">Pick Recomendado:</span>
-                  <span className="font-extrabold text-emerald-400">{selectedMatchForAI.aiPrediction.recommendation}</span>
-                </div>
-
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <span className="text-slate-400">Nivel de Confianza:</span>
-                  {/* FIX: se agrega el símbolo % explícitamente (confidence
-                      ahora viaja como número puro) */}
-                  <span className="font-mono font-bold text-amber-400">{selectedMatchForAI.aiPrediction.confidence ?? 85}%</span>
-                </div>
-
-                {selectedMatchForAI.aiPrediction.reasoning && (
-                  <div className="space-y-1 pt-1">
-                    <span className="text-[10px] font-mono text-slate-500 uppercase font-bold">Fundamento Algorítmico:</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">
-                      {selectedMatchForAI.aiPrediction.reasoning}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Link
-              href="/comunidad"
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-            >
-              <Target className="w-4 h-4" />
-              <span>Publicar este Análisis en Comunidad</span>
-            </Link>
-
-          </div>
-        </div>
+        <MatchModal match={selectedMatchForAI} onClose={() => setSelectedMatchForAI(null)} />
       )}
 
     </div>

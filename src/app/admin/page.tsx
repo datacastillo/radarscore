@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import InfoTooltip from '@/components/InfoTooltip';
 import { 
   ShieldAlert, 
   CheckCircle2, 
@@ -345,6 +346,7 @@ export default function AdminPanelPage() {
                           {isDreamerTicket && (
                             <span className="text-[9px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                               <Rocket className="w-2.5 h-2.5" /> SOÑADOR
+                              <InfoTooltip text="Pick con cuota @10.00 o más — alto riesgo, alta recompensa. No cuenta para el cálculo del Yield del usuario." side="bottom" />
                             </span>
                           )}
                           <span className="text-[10px] text-slate-500 font-mono">

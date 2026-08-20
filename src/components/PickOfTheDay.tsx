@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Match } from '@/data/mockMatches';
+import InfoTooltip from '@/components/InfoTooltip';
 
 interface PickOfTheDayProps {
   matches: Match[];
@@ -100,7 +101,10 @@ export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayPro
         </div>
 
         <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full">
-          <span className="text-[10px] text-zinc-400 font-bold uppercase">Confianza IA</span>
+          <span className="text-[10px] text-zinc-400 font-bold uppercase flex items-center gap-1">
+            Confianza IA
+            <InfoTooltip text="Qué tan clara es la ventaja de un equipo sobre el otro según el modelo estadístico. No es una garantía de resultado." side="bottom" />
+          </span>
           <span className="text-xs font-black text-emerald-400">{confidence}%</span>
         </div>
       </div>

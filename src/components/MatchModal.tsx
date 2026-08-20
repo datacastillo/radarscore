@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Match } from '@/data/mockMatches';
+import InfoTooltip from '@/components/InfoTooltip';
 
 interface MatchModalProps {
   match: Match;
@@ -106,8 +108,9 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
               <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20">
                 {match.time}
               </span>
-              <div className="text-xs text-zinc-500 mt-2 font-mono">
-                xG: {match.aiPrediction?.xGHome ?? 1.5} - {match.aiPrediction?.xGAway ?? 1.1}
+              <div className="text-xs text-zinc-500 mt-2 font-mono flex items-center justify-center gap-1">
+                <span>xG: {match.aiPrediction?.xGHome ?? 1.5} - {match.aiPrediction?.xGAway ?? 1.1}</span>
+                <InfoTooltip text="xG (Goles Esperados): mide cuántos goles debería anotar cada equipo según la calidad de sus oportunidades de gol, no el resultado real del partido." />
               </div>
             </div>
 
@@ -130,8 +133,9 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
             <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
               <span>🤖</span> ANÁLISIS TÁCTICO GEMINI AI
             </span>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded">
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded flex items-center gap-1">
               Confianza: {match.aiPrediction?.confidence ?? 85}%
+              <InfoTooltip text="Qué tan clara es la ventaja de un equipo sobre el otro según el modelo. Un partido muy parejo (33%/33%/34%) da confianza baja; una ventaja clara la sube. Nunca es una garantía de resultado." />
             </span>
           </div>
 
@@ -170,6 +174,7 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-xs">
             <h4 className="font-extrabold text-amber-400 mb-2 flex items-center gap-1">
               <span>🚩</span> Córners Esperados (xCorners)
+              <InfoTooltip text="Proyección de cuántos tiros de esquina tendrá el partido en total, basada en el promedio de córners a favor y en contra de cada equipo." />
             </h4>
             <div className="space-y-1.5 text-zinc-300">
               <div className="flex justify-between">
@@ -191,6 +196,7 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 text-xs">
             <h4 className="font-extrabold text-emerald-400 mb-2 flex items-center gap-1">
               <span>🎯</span> Marcadores Exactos (Poisson)
+              <InfoTooltip text="Usamos el modelo estadístico de Poisson (con un ajuste llamado Dixon-Coles, que corrige la probabilidad de marcadores bajos como 0-0 o 1-0) para calcular qué tan probable es cada resultado exacto." />
             </h4>
             <div className="space-y-1.5 text-zinc-300">
               {topScores && topScores.length > 0 ? (
@@ -208,6 +214,14 @@ export default function MatchModal({ match, onClose }: MatchModalProps) {
             </div>
           </div>
         </div>
+
+        {/* CTA: Publicar este análisis en Comunidad */}
+        <Link
+          href="/comunidad"
+          className="mt-5 w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+        >
+          <span>🎯 Publicar este pick en Comunidad</span>
+        </Link>
       </div>
     </div>
   );
