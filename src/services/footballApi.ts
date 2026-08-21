@@ -3,9 +3,13 @@ import { Match } from '@/data/mockMatches';
 const getLeagueEmoji = (leagueName?: string): string => {
   if (!leagueName) return '⚽';
   const upper = leagueName.toUpperCase();
+  // "Championship" (2da división inglesa) contiene "CHAMPIONS" como
+  // substring — se revisa ANTES del check de Champions League para que no
+  // se confundan entre sí.
+  if (upper.includes('CHAMPIONSHIP')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
   if (upper.includes('PREMIER') || upper.includes('GB')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
   if (upper.includes('LALIGA') || upper.includes('PRIMERA') || upper.includes('ES')) return '🇪🇸';
-  if (upper.includes('CHAMPIONS') || upper.includes('UEFA')) return '🇪🇺';
+  if (upper.includes('CHAMPIONS LEAGUE') || upper.includes('UEFA CHAMPIONS')) return '🇪🇺';
   if (upper.includes('SERIE A') || upper.includes('IT')) return '🇮🇹';
   if (upper.includes('LIGA MX') || upper.includes('MX')) return '🇲🇽';
   if (upper.includes('BUNDESLIGA') || upper.includes('DE')) return '🇩🇪';

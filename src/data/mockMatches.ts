@@ -6,8 +6,8 @@ export interface Team {
 
 export interface MatchStats {
   xg?: number[];
-  possession?: number[] | { home: number; away: number };
-  shotsOnTarget?: number[] | { home: number; away: number };
+  possession?: number[] | { home: number; away: number } | null;
+  shotsOnTarget?: number[] | { home: number; away: number } | null;
   corners?: number[] | { home: number; away: number };
   fouls?: number[];
 }
@@ -51,9 +51,18 @@ export interface Match {
     away: number;
   };
   stats?: MatchStats;
-  status: 'LIVE' | 'FT' | 'SCHEDULED';
+  // Se amplía a string para admitir los estados reales que manda
+  // football-data.org (FINISHED, IN_PLAY, POSTPONED, CANCELLED, etc.),
+  // no solo los 3 valores originales — evita tener que castear a string
+  // cada vez que se compara en otros archivos.
+  status: 'LIVE' | 'FT' | 'SCHEDULED' | string;
   time: string;
   dateCategory: 'EN VIVO' | 'AYER' | 'HOY' | 'MAÑANA' | 'PROXIMOS' | 'LIVE';
+  // true si la predicción se calculó con estadísticas reales de temporada
+  // de AMBOS equipos (goles a favor/en contra de la tabla de posiciones);
+  // false si el motor tuvo que usar valores neutros por defecto (típico
+  // en partidos de copa sin tabla de posiciones).
+  hasRealStats?: boolean;
   aiPrediction?: {
     recommendation: string;
     confidence: number;
@@ -90,6 +99,7 @@ export const MOCK_MATCHES: Match[] = [
     status: 'LIVE',
     time: "EN VIVO - 68'",
     dateCategory: 'PROXIMOS',
+    hasRealStats: true,
     aiPrediction: {
       recommendation: 'Gana Local o Empate',
       confidence: 88,
@@ -120,6 +130,7 @@ export const MOCK_MATCHES: Match[] = [
     status: 'SCHEDULED',
     time: '21:00',
     dateCategory: 'PROXIMOS',
+    hasRealStats: true,
     aiPrediction: {
       recommendation: 'Ambos Anotan / Gana Local',
       confidence: 85,
@@ -150,6 +161,7 @@ export const MOCK_MATCHES: Match[] = [
     status: 'SCHEDULED',
     time: 'PRÓXIMO MARTES - 20:00',
     dateCategory: 'PROXIMOS',
+    hasRealStats: true,
     aiPrediction: {
       recommendation: 'Over 2.5 Goles',
       confidence: 82,
@@ -180,6 +192,7 @@ export const MOCK_MATCHES: Match[] = [
     status: 'SCHEDULED',
     time: 'DOMINGO - 18:00',
     dateCategory: 'PROXIMOS',
+    hasRealStats: true,
     aiPrediction: {
       recommendation: 'Gana Inter o Empate',
       confidence: 86,

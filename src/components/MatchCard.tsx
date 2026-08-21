@@ -62,6 +62,20 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect }) => {
         )}
       </div>
 
+      {/* Aviso honesto cuando no hay estadísticas reales de temporada para
+          este partido (típico en copas sin tabla de posiciones) — evita
+          que una predicción genérica por defecto parezca un análisis
+          completo */}
+      {match.hasRealStats === false && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mb-3 flex items-center gap-1.5 text-[10px] text-amber-400/90 bg-amber-500/5 border border-amber-500/20 rounded-lg px-2.5 py-1.5"
+        >
+          <span>⚠️ Datos limitados para este partido</span>
+          <InfoTooltip text="No encontramos estadísticas de temporada de ambos equipos (común en partidos de copa sin tabla de posiciones). La predicción usa valores neutros en vez de datos específicos del equipo." side="bottom" />
+        </div>
+      )}
+
       {/* Enfrentamiento principal de Equipos */}
       <div className="grid grid-cols-3 items-center my-4">
         {/* Local */}

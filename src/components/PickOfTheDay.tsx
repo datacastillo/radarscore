@@ -19,7 +19,10 @@ interface PickOfTheDayProps {
 function getLeaguePriority(leagueName?: string): number {
   if (!leagueName) return 50;
   const upper = leagueName.toUpperCase();
-  if (upper.includes('CHAMPIONS')) return 100;
+  // "Championship" (2da división inglesa) contiene "CHAMPIONS" como
+  // substring — se revisa antes para no confundirla con Champions League.
+  if (upper.includes('CHAMPIONSHIP')) return 60;
+  if (upper.includes('CHAMPIONS LEAGUE') || upper.includes('UEFA CHAMPIONS')) return 100;
   if (upper.includes('PREMIER')) return 90;
   if (upper.includes('PRIMERA') || upper.includes('LALIGA') || upper.includes('LA LIGA')) return 85;
   if (upper.includes('BUNDESLIGA')) return 80;
@@ -40,8 +43,15 @@ export default function PickOfTheDay({ matches, onSelectMatch }: PickOfTheDayPro
 
   const pool = pendingMatches.length > 0 ? pendingMatches : matches;
 
+  // Si hay partidos con estadísticas reales de equipo disponibles, se
+  // prioriza ese grupo — evita destacar como "Pick del Día" un partido
+  // cuya predicción salió de los valores neutros por defecto (que se ven
+  // genéricos/repetidos entre distintos partidos sin datos).
+  const withRealStats = pool.filter((m: any) => m.hasRealStats);
+  const finalPool = withRealStats.length > 0 ? withRealStats : pool;
+
   // 2. Selección algorítmica del mejor partido
-  const bestMatch = [...pool].sort((a, b) => {
+  const bestMatch = [...finalPool].sort((a, b) => {
     const confA = a.aiPrediction?.confidence ?? 75;
     const confB = b.aiPrediction?.confidence ?? 75;
 
