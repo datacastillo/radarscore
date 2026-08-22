@@ -255,25 +255,25 @@ export function calculatePoissonPrediction(
 
   if (homeWinProb >= 58) {
     recommendedPick = `Gana ${homeTeamName}`;
-    recommendedPickReason = `El modelo Poisson proyecta un xG de ${lambdaHome.toFixed(2)} vs ${lambdaAway.toFixed(2)} con clara ventaja local.`;
+    recommendedPickReason = `El modelo Poisson proyecta un xG de ${lambdaHome.toFixed(2)} vs ${lambdaAway.toFixed(2)} (${homeWinProb}% de victoria local), con un empate cubriendo solo el ${drawProb}% de los escenarios simulados.`;
   } else if (awayWinProb >= 55) {
     recommendedPick = `Gana ${awayTeamName}`;
-    recommendedPickReason = `${awayTeamName} registra un xG proyectado superior de ${lambdaAway.toFixed(2)}.`;
+    recommendedPickReason = `${awayTeamName} registra un xG proyectado superior (${lambdaAway.toFixed(2)} vs ${lambdaHome.toFixed(2)}) y una probabilidad de victoria del ${awayWinProb}%, por encima del local.`;
   } else if (homeWinProb + drawProb >= 74) {
     recommendedPick = `Doble Oportunidad: ${homeTeamName} o Empate`;
-    recommendedPickReason = `Cubre el ${homeWinProb + drawProb}% de los escenarios simulados en la matriz Dixon-Coles.`;
+    recommendedPickReason = `Cubre el ${homeWinProb + drawProb}% de los escenarios simulados en la matriz Dixon-Coles (${homeWinProb}% victoria + ${drawProb}% empate), dejando solo ${awayWinProb}% de probabilidad a la visita.`;
   } else if (over85CornersProb >= 75) {
     recommendedPick = `Más de 8.5 Córners`;
-    recommendedPickReason = `Ambos equipos promedian ${lambdaTotalCorners.toFixed(1)} saques de esquina combinados proyectados.`;
+    recommendedPickReason = `Ambos equipos promedian ${lambdaTotalCorners.toFixed(1)} saques de esquina combinados proyectados, con ${over85CornersProb}% de probabilidad de superar el umbral y ${over95CornersProb}% de superar 9.5.`;
   } else if (over25Prob >= 62) {
     recommendedPick = `Más de 2.5 Goles`;
-    recommendedPickReason = `Expectativa de goles acumulada de ${(lambdaHome + lambdaAway).toFixed(2)}, ideal para un juego dinámico.`;
+    recommendedPickReason = `Expectativa de goles acumulada de ${(lambdaHome + lambdaAway).toFixed(2)} (${over25Prob}% de probabilidad de Over 2.5), con ambos equipos anotando en el ${bttsProb}% de los escenarios simulados.`;
   } else if (bttsProb >= 60) {
     recommendedPick = `Ambos Equipos Anotan (Sí)`;
-    recommendedPickReason = `Defensas con tasa de concesión superior al promedio proyectado.`;
+    recommendedPickReason = `Defensas con tasa de concesión superior al promedio proyectado — ${bttsProb}% de probabilidad de BTTS, con un xG combinado de ${(lambdaHome + lambdaAway).toFixed(2)}.`;
   } else {
     recommendedPick = `Menos de 3.5 Goles`;
-    recommendedPickReason = `Partido de tendencia táctica cerrada con bajo xG acumulado.`;
+    recommendedPickReason = `Partido de tendencia táctica cerrada con bajo xG acumulado (${(lambdaHome + lambdaAway).toFixed(2)}) y ${under25Prob}% de probabilidad de Under 2.5 goles.`;
   }
 
   return {
