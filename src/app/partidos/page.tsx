@@ -110,7 +110,10 @@ export default function PartidosPage() {
       if (selectedLeague === 'PL') return m.league?.includes('PREMIER') || m.flag === '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
       // Football-data.org llama a La Liga "Primera Division", no "LaLiga".
       if (selectedLeague === 'PD') return m.league?.includes('LALIGA') || m.league?.includes('PRIMERA') || m.flag === '🇪🇸';
-      if (selectedLeague === 'CL') return m.league?.includes('CHAMPIONS') || m.flag === '🇪🇺';
+      // "Championship" (2da división inglesa) contiene "CHAMPIONS" como
+      // substring, por eso se usa "CHAMPIONS LEAGUE" completo para no
+      // confundirlas.
+      if (selectedLeague === 'CL') return m.league?.includes('CHAMPIONS LEAGUE') || m.flag === '🇪🇺';
       if (selectedLeague === 'SA') return m.league?.includes('SERIE') || m.flag === '🇮🇹';
       if (selectedLeague === 'BL1') return m.league?.includes('BUNDESLIGA') || m.flag === '🇩🇪';
       return true;
