@@ -105,7 +105,7 @@ function NavbarContent() {
   return (
     <>
       {/* HEADER SUPERIOR GLOBAL ADAPTATIVO */}
-      <header className="sticky top-0 z-50 bg-[#07090E]/90 backdrop-blur-md border-b border-gray-800/80 w-full overflow-hidden">
+      <header className="sticky top-0 z-50 bg-[#07090E]/90 backdrop-blur-md border-b border-gray-800/80 w-full">
         <div className="max-w-6xl mx-auto px-2.5 sm:px-4 h-16 flex items-center justify-between gap-1 sm:gap-4">
           
           {/* Logo Brand */}
