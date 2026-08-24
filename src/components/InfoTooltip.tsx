@@ -37,8 +37,6 @@ export default function InfoTooltip({ text, side = 'top', size = 'sm' }: InfoToo
     <span
       ref={containerRef}
       className="relative inline-flex items-center"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
     >
       <button
         type="button"
@@ -46,7 +44,7 @@ export default function InfoTooltip({ text, side = 'top', size = 'sm' }: InfoToo
           e.stopPropagation();
           setIsOpen(prev => !prev);
         }}
-        className="text-slate-500 hover:text-emerald-400 transition cursor-help shrink-0"
+        className="text-slate-500 hover:text-emerald-400 transition cursor-pointer shrink-0 select-none"
         aria-label="Más información"
       >
         <Info className={iconSize} />
@@ -55,7 +53,7 @@ export default function InfoTooltip({ text, side = 'top', size = 'sm' }: InfoToo
       {isOpen && (
         <span
           onClick={(e) => e.stopPropagation()}
-          className={`absolute z-50 ${side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-56 sm:w-64 bg-[#0c0f17] border border-emerald-500/30 rounded-xl p-3 text-[11px] text-slate-300 leading-relaxed font-normal shadow-2xl normal-case tracking-normal`}
+          className={`absolute z-50 ${side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-56 sm:w-64 bg-[#0c0f17] border border-emerald-500/30 rounded-xl p-3 text-[11px] text-slate-300 leading-relaxed font-normal shadow-2xl normal-case tracking-normal select-text`}
         >
           {text}
           <span
