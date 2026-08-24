@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
 import CreatePickModal from '@/components/CreatePickModal';
 import InfoTooltip from '@/components/InfoTooltip';
+import MatchModal from '@/components/MatchModal';
 import { fetchRealMatches } from '@/services/footballApi';
 import { Match, MOCK_MATCHES } from '@/data/mockMatches';
 import { 
@@ -29,7 +30,6 @@ import {
   Target,
   Bot,
   Calendar,
-  BrainCircuit,
   Sparkle
 } from 'lucide-react';
 
@@ -945,80 +945,15 @@ export default function ComunidadPage() {
 
       </main>
 
-      {/* 🤖 MODAL FLOTANTE DE CONSULTA DE ANÁLISIS E INTELIGENCIA IA */}
+      {/* MODAL DE ANÁLISIS DE IA — componente compartido, ya blindado
+          (requiere sesión, muestra xG/córners reales, aviso de "Datos
+          limitados" si aplica). Antes este modal era una copia duplicada
+          e incompleta, distinta a la de /partidos. */}
       {selectedMatchForPrediction && (
-        <div 
-          onClick={() => setSelectedMatchForPrediction(null)}
-          className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-[#0c0f17] border border-emerald-500/40 w-full max-w-md rounded-3xl p-5 space-y-4 shadow-[0_0_50px_rgba(16,185,129,0.2)] relative text-white cursor-default"
-          >
-            {/* Header del Modal */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <BrainCircuit className="w-4.5 h-4.5" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase block">{selectedMatchForPrediction.league}</span>
-                  <h3 className="text-xs font-extrabold text-slate-100">{selectedMatchForPrediction.time}</h3>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSelectedMatchForPrediction(null)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Enfrentamiento */}
-            <div className="bg-[#06080e] border border-slate-800/80 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between text-sm font-black text-slate-100">
-                <div className="flex items-center gap-2">
-                  {selectedMatchForPrediction.homeTeam.logo ? (
-                    <img src={selectedMatchForPrediction.homeTeam.logo} alt="" className="w-5 h-5 object-contain" />
-                  ) : <span>⚽</span>}
-                  <span>{selectedMatchForPrediction.homeTeam.name}</span>
-                </div>
-                <span className="text-emerald-400 font-mono text-xs">{selectedMatchForPrediction.probs?.home}%</span>
-              </div>
-
-              <div className="flex items-center justify-between text-sm font-black text-slate-100">
-                <div className="flex items-center gap-2">
-                  {selectedMatchForPrediction.awayTeam.logo ? (
-                    <img src={selectedMatchForPrediction.awayTeam.logo} alt="" className="w-5 h-5 object-contain" />
-                  ) : <span>⚽</span>}
-                  <span>{selectedMatchForPrediction.awayTeam.name}</span>
-                </div>
-                <span className="text-slate-400 font-mono text-xs">{selectedMatchForPrediction.probs?.away}%</span>
-              </div>
-            </div>
-
-            {/* Pronóstico Destacado */}
-            {selectedMatchForPrediction.aiPrediction && (
-              <div className="bg-gradient-to-br from-emerald-500/15 to-emerald-950/30 border border-emerald-500/40 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono font-bold text-emerald-400">
-                  <span className="flex items-center gap-1"><Bot className="w-3.5 h-3.5" /> ANÁLISIS DE LA IA</span>
-                  <span className="bg-emerald-500/20 px-2 py-0.5 rounded-md">CONF. {selectedMatchForPrediction.aiPrediction.confidence}</span>
-                </div>
-
-                <p className="text-base font-black text-emerald-200">
-                  {selectedMatchForPrediction.aiPrediction.recommendation}
-                </p>
-
-                {selectedMatchForPrediction.aiPrediction.reasoning && (
-                  <p className="text-xs text-slate-300 leading-relaxed pt-2 border-t border-emerald-500/20">
-                    {selectedMatchForPrediction.aiPrediction.reasoning}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <MatchModal
+          match={selectedMatchForPrediction}
+          onClose={() => setSelectedMatchForPrediction(null)}
+        />
       )}
 
       {/* LIGHTBOX AMPLIFICADOR */}
