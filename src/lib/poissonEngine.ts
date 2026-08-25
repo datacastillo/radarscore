@@ -172,19 +172,21 @@ export function calculatePoissonPrediction(
   // -------------------------------------------------------------
   // 2. CÁLCULO DE CÓRNERS (xCorners)
   // -------------------------------------------------------------
+  // football-data.org no expone estadísticas de córners por equipo, así
+  // que antes esto usaba valores por defecto SIEMPRE iguales — por eso
+  // todos los partidos mostraban la misma proyección de córners. Ahora
+  // se deriva de homeAttack/awayAttack/homeDefense/awayDefense (la misma
+  // fuerza real de ataque/defensa que ya calcula el modelo de goles), así
+  // que si hay datos reales del equipo, el número de córners también varía
+  // de verdad — sin inventar una fuente de datos que no existe.
   const leagueAvgHomeCorners = 5.2;
   const leagueAvgAwayCorners = 4.4;
 
-  const homeCornersFor = stats?.homeCornersForAvg ?? 5.5;
-  const homeCornersAgainst = stats?.homeCornersAgainstAvg ?? 4.2;
-  const awayCornersFor = stats?.awayCornersForAvg ?? 4.3;
-  const awayCornersAgainst = stats?.awayCornersAgainstAvg ?? 5.6;
+  let lambdaCornerHome = leagueAvgHomeCorners * homeAttack * awayDefense;
+  let lambdaCornerAway = leagueAvgAwayCorners * awayAttack * homeDefense;
 
-  let lambdaCornerHome = (homeCornersFor / leagueAvgHomeCorners) * (awayCornersAgainst / leagueAvgAwayCorners) * leagueAvgHomeCorners;
-  let lambdaCornerAway = (awayCornersFor / leagueAvgAwayCorners) * (homeCornersAgainst / leagueAvgHomeCorners) * leagueAvgAwayCorners;
-
-  lambdaCornerHome = Math.max(1.5, Math.min(10.0, lambdaCornerHome));
-  lambdaCornerAway = Math.max(1.5, Math.min(10.0, lambdaCornerAway));
+  lambdaCornerHome = Math.max(2.5, Math.min(9.0, lambdaCornerHome));
+  lambdaCornerAway = Math.max(2.0, Math.min(8.0, lambdaCornerAway));
 
   const lambdaTotalCorners = lambdaCornerHome + lambdaCornerAway;
 
